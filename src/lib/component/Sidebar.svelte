@@ -2,10 +2,35 @@
   import { page } from '$app/stores';
   import { darkMode } from '$lib/stores/darkMode.js';
 
+  export let staffId = "";
   export let staffName = "";
   export let role = "";
   export let closeSidebar = () => {};
   export let sidebarCollapsed = false;
+  export let pictureUrl = "";
+
+  let resolvedPictureUrl = pictureUrl;
+
+  $: if ((!pictureUrl || pictureUrl === '') && staffId) {
+    fetch(`/api/public_url?id=${staffId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.pictureUrl) {
+          resolvedPictureUrl = data.pictureUrl;
+        } else {
+          resolvedPictureUrl = '/default-avatar.png';
+        }
+      })
+      .catch(() => {
+        resolvedPictureUrl = '/default-avatar.png';
+      });
+  } else {
+    resolvedPictureUrl = pictureUrl || '/default-avatar.png';
+  }
+
+  function handleImgError() {
+    resolvedPictureUrl = '/default-avatar.png';
+  }
 
   async function handleLogout() {
     await fetch('/api/logout', { method: 'POST' });
@@ -55,8 +80,12 @@
     {#if staffName && role && !sidebarCollapsed}
       <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 w-full">
         <div class="flex items-center space-x-3">
-          <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-            {staffName.charAt(0).toUpperCase()}
+          <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden">
+            {#if resolvedPictureUrl}
+              <img src={resolvedPictureUrl} alt="Profile" class="w-12 h-12 object-cover rounded-full" on:error={handleImgError} />
+            {:else}
+              {staffName.charAt(0).toUpperCase()}
+            {/if}
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{staffName}</p>

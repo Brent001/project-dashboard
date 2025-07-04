@@ -13,7 +13,8 @@
 		"moduleResolution": "NodeNext",
 		"baseUrl": ".",
 		"paths": {
-			"$lib/*": ["src/lib/*"]
+			"$lib/*": ["./src/lib/*"],
+			"$lib/server/*": ["./src/lib/server/*"]
 		}
 	}
 }

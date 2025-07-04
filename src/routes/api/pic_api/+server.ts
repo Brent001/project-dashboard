@@ -54,12 +54,13 @@ const uploadToCloudinary = async (buffer: Buffer, username: string): Promise<Upl
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: UPLOAD_CONSTRAINTS.folder,
-        public_id: username, // Use username as image name
+        public_id: `${UPLOAD_CONSTRAINTS.folder}/${username}`, // Use full path as public_id
         overwrite: true,
         transformation: UPLOAD_CONSTRAINTS.transformations
       },
       (error, result) => {
         if (error) {
+          console.error('Cloudinary upload error:', error);
           reject(new Error(`Cloudinary upload failed: ${error.message}`));
         } else if (!result) {
           reject(new Error('Upload failed: No result returned'));
@@ -87,11 +88,23 @@ const generateImageUrl = (publicId: string): string => {
 // Request handlers
 export const POST: RequestHandler = async ({ request }) => {
   try {
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const username = formData.get('username') as string;
+
+    if (!file || !username) {
+      console.error('Missing file or username');
+      return json({ success: false, error: 'Missing file or username' }, { status: 400 });
+    }
+
     validateEnvironmentVariables();
     
-    const formData = await request.formData();
-    const file = formData.get('file');
-    const username = formData.get('username') as string;
+    if (!username || username.trim() === '') {
+      return json({
+        success: false,
+        error: 'Username is required'
+      }, { status: 400 });
+    }
     
     validateFile(file);
     
@@ -113,17 +126,8 @@ export const POST: RequestHandler = async ({ request }) => {
     });
     
   } catch (error) {
-    console.error('Upload error:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-    const statusCode = errorMessage.includes('No file') || 
-                      errorMessage.includes('Invalid file') || 
-                      errorMessage.includes('File too large') ? 400 : 500;
-    
-    return json({
-      success: false,
-      error: errorMessage
-    }, { status: statusCode });
+    console.error('Cloudinary upload error:', error);
+    return json({ success: false, error: 'Cloudinary upload failed: ' + error.message }, { status: 500 });
   }
 };
 

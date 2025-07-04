@@ -26,8 +26,10 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
         const students = await res.json();
 
         return {
+            staffId: user.id,
             staffName: user.username,
             role: user.role,
+            pictureUrl: user.pictureUrl ?? '',
             students
         };
     } catch (error) {

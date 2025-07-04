@@ -1,8 +1,8 @@
 import type { PageServerLoad } from './$types.js';
 import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { staff, student, schedule } from '$lib/server/db/schema';
-import { eq, count } from 'drizzle-orm';
+import { staff } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ cookies }) => {
     try {
@@ -11,38 +11,23 @@ export const load: PageServerLoad = async ({ cookies }) => {
             throw redirect(302, '/');
         }
 
-        // Find user by username from session cookie
+        // Fetch the current user from the database
         const user = await db.select().from(staff).where(eq(staff.username, session)).get();
         if (!user) {
             cookies.delete('session', { path: '/' });
             throw redirect(302, '/');
         }
 
-        // Get dashboard stats
-        const [studentCountResult, scheduleCountResult, staffCountResult] = await Promise.all([
-            db.select({ count: count() }).from(student),
-            db.select({ count: count() }).from(schedule),
-            db.select({ count: count() }).from(staff)
-        ]);
-
-        const studentCount = studentCountResult[0]?.count ?? 0;
-        const scheduleCount = scheduleCountResult[0]?.count ?? 0;
-        const staffCount = staffCountResult[0]?.count ?? 0;
-
         return {
             staffId: user.id,
             staffName: user.username,
             role: user.role,
-            pictureUrl: user.pictureUrl ?? '',
-            studentCount,
-            scheduleCount,
-            staffCount
+            pictureUrl: user.pictureUrl ?? ''
         };
     } catch (error) {
         if (error instanceof Response) {
             throw error;
         }
-        console.error('Dashboard load error:', error);
         cookies.delete('session', { path: '/' });
         throw redirect(302, '/');
     }

@@ -5,7 +5,7 @@
 
   export let data;
 
-  let { staffName, role, studentCount, scheduleCount, staffCount } = data;
+  let { staffId, staffName, role, pictureUrl, studentCount, scheduleCount, staffCount } = data;
   let sidebarOpen = false;
   let sidebarCollapsed = true;
 
@@ -24,7 +24,7 @@
   <!-- Sidebar for desktop -->
   <aside class="hidden md:block">
     <div class={`transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
-      <Sidebar {staffName} {role} {closeSidebar} {sidebarCollapsed} />
+      <Sidebar {staffId} {staffName} {role} {closeSidebar} {sidebarCollapsed} pictureUrl={pictureUrl} />
     </div>
   </aside>
   <!-- Sidebar overlay for mobile -->
@@ -32,19 +32,21 @@
     <div class="fixed inset-0 z-40 flex md:hidden">
       <div class="fixed inset-0 bg-black opacity-40" on:click={closeSidebar}></div>
       <div class="relative z-50 w-64 transition-all duration-300" transition:fly="{{ x: -300, duration: 300 }}">
-        <Sidebar {staffName} {role} {closeSidebar} sidebarCollapsed={false} />
+        <Sidebar {staffId} {staffName} {role} {closeSidebar} sidebarCollapsed={false} pictureUrl={pictureUrl} />
       </div>
     </div>
   {/if}
 
   <div class="flex-1 flex flex-col min-w-0">
     <Navbar
+      {staffId}
       {staffName}
       {role}
       {sidebarOpen}
       {toggleSidebar}
       {sidebarCollapsed}
       {toggleSidebarCollapsed}
+      pictureUrl={pictureUrl}
     />
     <main class="flex-1 p-6 md:p-10 overflow-y-auto">
       <div class="max-w-5xl mx-auto space-y-8">

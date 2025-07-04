@@ -12,44 +12,46 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
   try {
     const body = await request.json();
-    const { url, public_id } = body;
+    const { pictureId, pictureUrl } = body;
 
-    // Validate that at least one of url or public_id is provided
-    if (!url && !public_id) {
-      return json({ error: 'No URL or public_id provided' }, { status: 400 });
+    if (!pictureId || !pictureUrl) {
+      return json({ error: 'Missing pictureId or pictureUrl' }, { status: 400 });
     }
 
-    // Store the public_id if provided, otherwise fall back to URL
-    const pictureId = public_id || url;
+    const existingUser = await db.select({ id: staff.id, username: staff.username })
+      .from(staff)
+      .where(eq(staff.username, session))
+      .get();
 
-    // Update the staff record
+    if (!existingUser) {
+      return json({ error: 'User not found' }, { status: 404 });
+    }
+
     const result = await db.update(staff)
-      .set({ 
-        pictureId,
-        updatedAt: new Date() // Assuming you have an updatedAt field
-      })
-      .where(eq(staff.username, session));
+      .set({ pictureId, pictureUrl })
+      .where(eq(staff.username, session))
+      .returning({ id: staff.id, username: staff.username });
 
-    // Check if the update affected any rows
-    if (result.changes === 0) {
-      return json({ error: 'User not found or no changes made' }, { status: 404 });
+    if (!result.length) {
+      return json({ error: 'Failed to update profile picture' }, { status: 500 });
     }
 
-    return json({ 
-      success: true, 
+    return json({
+      success: true,
       message: 'Profile picture updated successfully',
-      pictureId 
+      pictureId,
+      pictureUrl
     });
 
   } catch (error: any) {
     console.error('Database update error:', error);
-    return json({ 
-      error: 'Failed to update profile picture' 
+    return json({
+      error: 'Failed to update profile picture'
     }, { status: 500 });
   }
 };
 
-// Optional: GET endpoint to retrieve current profile picture
+// GET endpoint to retrieve current profile picture
 export const GET: RequestHandler = async ({ cookies }) => {
   const session = cookies.get('session');
   if (!session) {
@@ -57,7 +59,10 @@ export const GET: RequestHandler = async ({ cookies }) => {
   }
 
   try {
-    const user = await db.select({ pictureId: staff.pictureId })
+    const user = await db.select({
+      pictureId: staff.pictureId,
+      pictureUrl: staff.pictureUrl
+    })
       .from(staff)
       .where(eq(staff.username, session))
       .get();
@@ -66,15 +71,17 @@ export const GET: RequestHandler = async ({ cookies }) => {
       return json({ error: 'User not found' }, { status: 404 });
     }
 
-    return json({ 
+    return json({
+      success: true,
       pictureId: user.pictureId,
+      pictureUrl: user.pictureUrl,
       hasProfilePicture: !!user.pictureId
     });
 
   } catch (error: any) {
     console.error('Database query error:', error);
-    return json({ 
-      error: 'Failed to retrieve profile picture' 
+    return json({
+      error: 'Failed to retrieve profile picture'
     }, { status: 500 });
   }
 };

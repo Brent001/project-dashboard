@@ -2,15 +2,41 @@
   import { onMount } from 'svelte';
   import { darkMode } from '$lib/stores/darkMode.js';
 
+  export let staffId = "";
   export let staffName = "";
   export let role = "";
   export let sidebarOpen = false;
   export let toggleSidebar = () => {};
   export let sidebarCollapsed = false;
   export let toggleSidebarCollapsed = () => {};
+  export let pictureUrl = "";
 
   let currentTime = new Date();
   let showProfile = false;
+
+  let resolvedPictureUrl = pictureUrl;
+
+  // If no pictureUrl from DB or it's empty, fetch from public API
+  $: if ((!pictureUrl || pictureUrl === '') && staffId) {
+    fetch(`/api/public_url?id=${staffId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.pictureUrl) {
+          resolvedPictureUrl = data.pictureUrl;
+        } else {
+          resolvedPictureUrl = '/default-avatar.png';
+        }
+      })
+      .catch(() => {
+        resolvedPictureUrl = '/default-avatar.png';
+      });
+  } else {
+    resolvedPictureUrl = pictureUrl || '/default-avatar.png';
+  }
+
+  function handleImgError() {
+    resolvedPictureUrl = '/default-avatar.png';
+  }
 
   onMount(() => {
     const interval = setInterval(() => {
@@ -95,8 +121,12 @@
         on:click={() => showProfile = !showProfile}
         aria-label="Profile menu"
       >
-        <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
-          {staffName ? staffName.charAt(0).toUpperCase() : 'U'}
+        <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold overflow-hidden">
+          {#if resolvedPictureUrl}
+            <img src={resolvedPictureUrl} alt="Profile" class="w-8 h-8 object-cover rounded-full" on:error={handleImgError} />
+          {:else}
+            {staffName ? staffName.charAt(0).toUpperCase() : 'U'}
+          {/if}
         </div>
         <span class="hidden md:block text-sm text-gray-900 dark:text-white">{staffName}</span>
         <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
