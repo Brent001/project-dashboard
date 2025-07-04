@@ -38,6 +38,11 @@
     resolvedPictureUrl = '/default-avatar.png';
   }
 
+  async function handleLogout() {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/';
+  }
+
   onMount(() => {
     const interval = setInterval(() => {
       currentTime = new Date();
@@ -137,7 +142,10 @@
         <div class="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 rounded shadow border border-gray-200 dark:border-gray-700 z-50">
           <a href="/profile" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Profile</a>
           <a href="/settings" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Settings</a>
-          <button class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" on:click={() => { /* sign out logic */ }}>Sign Out</button>
+          <button
+            class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+            on:click={handleLogout}
+          >Sign Out</button>
         </div>
         <div class="fixed inset-0 z-40" on:click={() => showProfile = false}></div>
       {/if}
