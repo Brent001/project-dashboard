@@ -85,9 +85,20 @@ const generateImageUrl = (publicId: string): string => {
   });
 };
 
+// Require authentication for this endpoint
+function requireAuth(cookies: import('@sveltejs/kit').Cookies) {
+  const session = cookies.get('session');
+  if (!session) {
+    throw json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return session;
+}
+
 // Request handlers
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
+    requireAuth(cookies);
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const username = formData.get('username') as string;
@@ -127,12 +138,17 @@ export const POST: RequestHandler = async ({ request }) => {
     
   } catch (error) {
     console.error('Cloudinary upload error:', error);
-    return json({ success: false, error: 'Cloudinary upload failed: ' + error.message }, { status: 500 });
+    return json({ 
+      success: false, 
+      error: 'Cloudinary upload failed: ' + (error instanceof Error ? error.message : String(error)) 
+    }, { status: 500 });
   }
 };
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, cookies }) => {
   try {
+    requireAuth(cookies);
+
     validateEnvironmentVariables();
     
     const publicId = url.searchParams.get('public_id');

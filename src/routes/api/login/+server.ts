@@ -37,11 +37,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), { status: 401 });
     }
 
-    // Set session cookie to username
+    // Set session cookie to username (secure, httpOnly, strict)
     cookies.set('session', user.username, {
         path: '/',
         httpOnly: true,
         sameSite: 'strict',
+        secure: true, // Only send cookie over HTTPS
         maxAge: 60 * 60 * 24 // 1 day
     });
 
