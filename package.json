@@ -41,6 +41,8 @@
 		"@tailwindcss/forms": "^0.5.9",
 		"@tailwindcss/typography": "^0.5.15",
 		"@tailwindcss/vite": "^4.0.0",
+		"@types/bcrypt": "^6.0.0",
+		"@types/crypto-js": "^4.2.2",
 		"@types/node": "^20",
 		"autoprefixer": "^10.4.21",
 		"drizzle-kit": "^0.30.2",
@@ -62,6 +64,8 @@
 		"@oslojs/encoding": "^1.1.0",
 		"bcrypt": "^6.0.0",
 		"cloudinary": "^2.7.0",
+		"crypto-js": "^4.2.0",
+		"date-fns": "^4.1.0",
 		"drizzle-orm": "^0.40.1",
 		"oslo": "^1.2.1"
 	}

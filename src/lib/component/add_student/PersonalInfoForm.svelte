@@ -101,4 +101,27 @@
       <input id="zipCode" type="text" class="form-input w-full" placeholder="Zip Code" bind:value={form.zipCode} disabled={isSubmitting} />
     </div>
   </div>
+  <div class="flex flex-col md:flex-row gap-4">
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="nationality">Nationality</label>
+      <input id="nationality" type="text" class="form-input w-full" placeholder="Nationality" bind:value={form.nationality} disabled={isSubmitting} />
+    </div>
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="religion">Religion</label>
+      <input id="religion" type="text" class="form-input w-full" placeholder="Religion" bind:value={form.religion} disabled={isSubmitting} />
+    </div>
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="civilStatus">Civil Status</label>
+      <select id="civilStatus" class="form-select w-full" bind:value={form.civilStatus} disabled={isSubmitting}>
+        <option value="Single">Single</option>
+        <option value="Married">Married</option>
+        <option value="Widowed">Widowed</option>
+        <option value="Separated">Separated</option>
+      </select>
+    </div>
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="enrollmentDate">Enrollment Date</label>
+      <input id="enrollmentDate" type="date" class="form-input w-full" bind:value={form.enrollmentDate} disabled={isSubmitting} />
+    </div>
+  </div>
 </div>

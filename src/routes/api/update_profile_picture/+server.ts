@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { staff } from '$lib/server/db/schema';
+import { db } from '$lib/server/db/index.js';
+import { staff } from '$lib/server/db/schema/schema.js';
 import { eq } from 'drizzle-orm';
 import { json } from '@sveltejs/kit';
 

@@ -189,24 +189,55 @@
           
           <!-- Desktop Filters -->
           <div class="hidden md:flex gap-3">
-            <select bind:value={selectedCourse} class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
-              <option value="">All Courses</option>
-              {#each courses as course}
-                <option value={course}>{course}</option>
-              {/each}
-            </select>
-            <select bind:value={selectedYear} class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
-              <option value="">All Years</option>
-              {#each years as year}
-                <option value={year}>{year}</option>
-              {/each}
-            </select>
-            <select bind:value={selectedSection} class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
-              <option value="">All Sections</option>
-              {#each sections as section}
-                <option value={section}>{section}</option>
-              {/each}
-            </select>
+            <!-- Replace your <select> blocks with this custom dropdown markup -->
+            <div class="relative w-full">
+              <select
+                bind:value={selectedCourse}
+                class="appearance-none w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+              >
+                <option value="">All Courses</option>
+                {#each courses as course}
+                  <option value={course}>{course}</option>
+                {/each}
+              </select>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </span>
+            </div>
+            <div class="relative w-full">
+              <select
+                bind:value={selectedYear}
+                class="appearance-none w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+              >
+                <option value="">All Years</option>
+                {#each years as year}
+                  <option value={year}>{year}</option>
+                {/each}
+              </select>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </span>
+            </div>
+            <div class="relative w-full">
+              <select
+                bind:value={selectedSection}
+                class="appearance-none w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+              >
+                <option value="">All Sections</option>
+                {#each sections as section}
+                  <option value={section}>{section}</option>
+                {/each}
+              </select>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </span>
+            </div>
             <button
               class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               on:click={resetFilters}

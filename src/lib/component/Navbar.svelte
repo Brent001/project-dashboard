@@ -1,10 +1,10 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { darkMode } from '$lib/stores/darkMode.js';
 
   export let staffId = "";
   export let staffName = "";
-  export let role = "";
+  export const role = "";
   export let sidebarOpen = false;
   export let toggleSidebar = () => {};
   export let sidebarCollapsed = false;
@@ -76,6 +76,15 @@
       day: 'numeric'
     });
   }
+
+  function getInitials(name: string) {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
 </script>
 
 <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2 flex items-center justify-between sticky top-0 z-30">
@@ -126,11 +135,17 @@
         on:click={() => showProfile = !showProfile}
         aria-label="Profile menu"
       >
+        <!-- Show initials if no real photo -->
         <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold overflow-hidden">
-          {#if resolvedPictureUrl}
-            <img src={resolvedPictureUrl} alt="Profile" class="w-8 h-8 object-cover rounded-full" on:error={handleImgError} />
+          {#if resolvedPictureUrl && resolvedPictureUrl !== '/default-avatar.png'}
+            <img
+              src={resolvedPictureUrl}
+              alt="Profile"
+              class="w-8 h-8 object-cover rounded-full"
+              on:error={handleImgError}
+            />
           {:else}
-            {staffName ? staffName.charAt(0).toUpperCase() : 'U'}
+            {getInitials(staffName)}
           {/if}
         </div>
         <span class="hidden md:block text-sm text-gray-900 dark:text-white">{staffName}</span>

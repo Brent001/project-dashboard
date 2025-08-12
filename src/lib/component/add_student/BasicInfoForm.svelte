@@ -63,4 +63,30 @@
       <input id="section" type="text" class="form-input w-full" placeholder="Enter section" bind:value={form.section} disabled={isSubmitting} />
     </div>
   </div>
+  <div class="flex flex-col md:flex-row gap-4">
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="contactNumber">Contact Number</label>
+      <input id="contactNumber" type="text" class="form-input w-full" placeholder="Enter contact number" bind:value={form.contactNumber} disabled={isSubmitting} />
+    </div>
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="email">Email</label>
+      <input id="email" type="email" class="form-input w-full" placeholder="Enter email" bind:value={form.email} disabled={isSubmitting} />
+    </div>
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="studentType">Student Type</label>
+      <select id="studentType" class="form-select w-full" bind:value={form.studentType} disabled={isSubmitting}>
+        <option value="Regular">Regular</option>
+        <option value="Irregular">Irregular</option>
+      </select>
+    </div>
+    <div class="flex-1 flex flex-col">
+      <label class="form-label" for="studentStatus">Student Status</label>
+      <select id="studentStatus" class="form-select w-full" bind:value={form.studentStatus} disabled={isSubmitting}>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+        <option value="Graduated">Graduated</option>
+        <option value="Dropped">Dropped</option>
+      </select>
+    </div>
+  </div>
 </div>

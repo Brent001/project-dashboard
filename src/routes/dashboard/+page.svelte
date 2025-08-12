@@ -24,7 +24,14 @@
   <!-- Sidebar for desktop -->
   <aside class="hidden md:block">
     <div class={`transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
-      <Sidebar {staffId} {staffName} {role} {closeSidebar} {sidebarCollapsed} pictureUrl={pictureUrl} />
+      <Sidebar
+        staffId={staffId ?? undefined}
+        staffName={staffName ?? undefined}
+        role={role ?? undefined}
+        {closeSidebar}
+        {sidebarCollapsed}
+        pictureUrl={pictureUrl ?? undefined}
+      />
     </div>
   </aside>
   <!-- Sidebar overlay for mobile -->
@@ -32,21 +39,28 @@
     <div class="fixed inset-0 z-40 flex md:hidden">
       <div class="fixed inset-0 bg-black opacity-40" on:click={closeSidebar}></div>
       <div class="relative z-50 w-64 transition-all duration-300" transition:fly="{{ x: -300, duration: 300 }}">
-        <Sidebar {staffId} {staffName} {role} {closeSidebar} sidebarCollapsed={false} pictureUrl={pictureUrl} />
+        <Sidebar
+          staffId={staffId ?? undefined}
+          staffName={staffName ?? undefined}
+          role={role ?? undefined}
+          {closeSidebar}
+          sidebarCollapsed={false}
+          pictureUrl={pictureUrl ?? undefined}
+        />
       </div>
     </div>
   {/if}
 
   <div class="flex-1 flex flex-col min-w-0">
     <Navbar
-      {staffId}
-      {staffName}
-      {role}
+      staffId={staffId ?? undefined}
+      staffName={staffName ?? undefined}
+      role={role ?? undefined}
       {sidebarOpen}
       {toggleSidebar}
       {sidebarCollapsed}
       {toggleSidebarCollapsed}
-      pictureUrl={pictureUrl}
+      pictureUrl={pictureUrl ?? undefined}
     />
     <main class="flex-1 p-6 md:p-10 overflow-y-auto">
       <div class="max-w-5xl mx-auto space-y-8">

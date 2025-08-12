@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { student } from '$lib/server/db/schema';
+import { db } from '$lib/server/db/index.js';
+import { student } from '$lib/server/db/schema/schema.js';
 import { eq } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -8,7 +8,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const data = await request.json();
 
     // Validate required fields
-    if (!data.studNo || !data.firstName || !data.lastName || !data.course) {
+    if (!data.studNo || !data.firstName || !data.lastName || !data.courseId) {
       return new Response(JSON.stringify({ error: 'Missing required fields.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ request }) => {
       });
     }
 
-    // Prepare data for insertion
+    // Prepare data for insertion (map fields to schema)
     const studentData = {
       studNo: data.studNo,
       firstName: data.firstName,
@@ -45,16 +45,24 @@ export const POST: RequestHandler = async ({ request }) => {
       email: data.email || null,
       pictureId: data.pictureId || null,
       pictureUrl: data.pictureUrl || null,
-      course: data.course,
-      yearLevel: data.yearLevel || null,
-      section: data.section || null,
+      courseId: data.courseId, // must be courseId from client
+      currentYearLevelId: data.currentYearLevelId || null,
+      currentSectionId: data.currentSectionId || null,
+      studentType: data.studentType || 'Regular',
+      studentStatus: data.studentStatus || 'Active',
+      totalUnitsEarned: 0,
+      totalUnitsEnrolled: 0,
+      cumulativeGPA: null,
+      academicStanding: 'Good Standing',
       guardian: data.guardian || null,
       guardianPhone: data.guardianPhone || null,
       mother: data.mother || null,
       father: data.father || null,
-      nationality: data.nationality || null,
+      nationality: data.nationality || 'Filipino',
       religion: data.religion || null,
-      civilStatus: data.civilStatus || null
+      civilStatus: data.civilStatus || 'Single',
+      enrollmentDate: new Date().toISOString(),
+      isActive: true
     };
 
     // Insert new student

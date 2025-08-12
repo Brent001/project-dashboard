@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types.js';
 import { redirect } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { staff, student, schedule } from '$lib/server/db/schema';
+import { db } from '$lib/server/db/index.js';
+import { staff, student, schedule } from '$lib/server/db/schema/schema.js';
 import { eq, count } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ cookies }) => {

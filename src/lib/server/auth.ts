@@ -2,8 +2,8 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { sha256 } from '@oslojs/crypto/sha2';
 import { encodeBase64url, encodeHexLowerCase } from '@oslojs/encoding';
-import { db } from '$lib/server/db';
-import * as table from '$lib/server/db/schema';
+import { db } from '$lib/server/db/index.js';
+import * as table from '$lib/server/db/schema/schema.js';
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -16,26 +16,27 @@ export function generateSessionToken() {
 }
 
 export async function createSession(token: string, userId: string) {
-	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-	const session: table.Session = {
-		id: sessionId,
-		userId,
-		expiresAt: new Date(Date.now() + DAY_IN_MS * 30)
-	};
-	await db.insert(table.session).values(session);
-	return session;
+		const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
+		const session: table.Session = {
+				id: sessionId,
+				userId,
+				expiresAt: new Date(Date.now() + DAY_IN_MS * 30),
+				createdAt: new Date() // Add this line
+		};
+		await db.insert(table.session).values(session);
+		return session;
 }
 
 export async function validateSessionToken(token: string) {
 	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
 	const [result] = await db
 		.select({
-			// Adjust user table here to tweak returned data
-			user: { id: table.user.id, username: table.user.username },
+			// Adjust staff table here to tweak returned data
+			user: { id: table.staff.id, username: table.staff.username },
 			session: table.session
 		})
 		.from(table.session)
-		.innerJoin(table.user, eq(table.session.userId, table.user.id))
+		.innerJoin(table.staff, eq(table.session.userId, table.staff.id))
 		.where(eq(table.session.id, sessionId));
 
 	if (!result) {
@@ -45,17 +46,21 @@ export async function validateSessionToken(token: string) {
 
 	const sessionExpired = Date.now() >= session.expiresAt.getTime();
 	if (sessionExpired) {
-		await db.delete(table.session).where(eq(table.session.id, session.id));
+		if (typeof session.id === 'string') {
+			await db.delete(table.session).where(eq(table.session.id, session.id));
+		}
 		return { session: null, user: null };
 	}
 
 	const renewSession = Date.now() >= session.expiresAt.getTime() - DAY_IN_MS * 15;
 	if (renewSession) {
 		session.expiresAt = new Date(Date.now() + DAY_IN_MS * 30);
-		await db
-			.update(table.session)
-			.set({ expiresAt: session.expiresAt })
-			.where(eq(table.session.id, session.id));
+		if (typeof session.id === 'string') {
+			await db
+				.update(table.session)
+				.set({ expiresAt: session.expiresAt })
+				.where(eq(table.session.id, session.id));
+		}
 	}
 
 	return { session, user };
@@ -63,8 +68,9 @@ export async function validateSessionToken(token: string) {
 
 export type SessionValidationResult = Awaited<ReturnType<typeof validateSessionToken>>;
 
-export async function invalidateSession(sessionId: string) {
-	await db.delete(table.session).where(eq(table.session.id, sessionId));
+export async function invalidateSession(sessionId: string | null) {
+    if (!sessionId) return; // Don't call eq() with null
+    await db.delete(table.session).where(eq(table.session.id, sessionId));
 }
 
 export function setSessionTokenCookie(event: RequestEvent, token: string, expiresAt: Date) {
