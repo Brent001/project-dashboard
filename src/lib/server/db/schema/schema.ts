@@ -73,11 +73,34 @@ export const curriculum = sqliteTable('curriculum', {
 export const student = sqliteTable('student', {
     studNo: text('stud_no').primaryKey(),
     firstName: text('first_name').notNull(),
+    middleName: text('middle_name'),
     lastName: text('last_name').notNull(),
-    courseId: text('course_id').notNull().references(() => course.id),
-    currentYearLevelId: text('current_year_level_id').references(() => yearLevel.id),
-    currentSectionId: text('current_section_id').references(() => section.id),
-    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true)
+    gender: text('gender'),
+    age: integer('age'),
+    birthDate: text('birth_date'),
+    birthPlace: text('birth_place'),
+    address: text('address'),
+    houseNo: text('house_no'),
+    street: text('street'),
+    barangay: text('barangay'),
+    city: text('city'),
+    province: text('province'),
+    zipCode: text('zip_code'),
+    contactNumber: text('contact_number'),
+    email: text('email'),
+    pictureId: text('picture_id'),
+    pictureUrl: text('picture_url'),
+    course: text('course').notNull(),           // <-- changed from courseId to course (text)
+    yearLevel: text('year_level'),              // <-- changed from currentYearLevelId to yearLevel (text)
+    section: text('section'),                   // <-- changed from currentSectionId to section (text)
+    guardian: text('guardian'),
+    guardianPhone: text('guardian_phone'),
+    mother: text('mother'),
+    father: text('father'),
+    nationality: text('nationality'),
+    religion: text('religion'),
+    civilStatus: text('civil_status')
+    // Remove fields: courseId, currentYearLevelId, currentSectionId, etc.
 });
 
 // Class schedules
@@ -109,6 +132,14 @@ export const grade = sqliteTable('grade', {
     maxScore: real('max_score').notNull()
 });
 
+// Sessions table
+export const session = sqliteTable('session', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    createdAt: text('created_at').notNull()
+});
+
 // Type exports (keep as is)
 export type Session = typeof staff.$inferSelect;
 export type Staff = typeof staff.$inferSelect;
@@ -135,3 +166,4 @@ export type InsertAcademicTerm = typeof academicTerm.$inferInsert;
 export type InsertSchedule = typeof schedule.$inferInsert;
 export type InsertStudentSchedule = typeof studentSchedule.$inferInsert;
 export type InsertGrade = typeof grade.$inferInsert;
+export type InsertSession = typeof session.$inferInsert;

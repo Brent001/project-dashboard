@@ -2,8 +2,8 @@
   import Sidebar from '$lib/component/Sidebar.svelte';
   import Navbar from '$lib/component/Navbar.svelte';
   import { goto } from '$app/navigation';
+  import { encrypt } from '$lib/client/crypto.js';
 
-  // You may want to get these from the parent layout or session in a real app
   export let data: any;
   let staffId = data?.staffId ?? '';
   let staffName = data?.staffName ?? '';
@@ -36,10 +36,21 @@
       return;
     }
 
-    const res = await fetch('/api/staff', {
+    // Encrypt the payload
+    const encryptedData = encrypt(
+      JSON.stringify({
+        username,
+        email,
+        role: newRole,
+        password
+        // Optionally add: firstName, lastName, pictureId, pictureUrl
+      })
+    );
+
+    const res = await fetch('/api/staff/add_staff', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, role: newRole, password })
+      body: JSON.stringify({ encryptedData })
     });
 
     if (res.ok) {
@@ -47,7 +58,7 @@
       setTimeout(() => goto('/staff'), 1200);
     } else {
       const data = await res.json().catch(() => ({}));
-      error = data?.message || 'Failed to add staff.';
+      error = data?.error || data?.message || 'Failed to add staff.';
     }
   }
 

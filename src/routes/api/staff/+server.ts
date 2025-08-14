@@ -84,7 +84,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate a UUID for the new staff member
+    const id = crypto.randomUUID();
+
     await db.insert(staff).values({
+      id,
       username,
       email,
       role,

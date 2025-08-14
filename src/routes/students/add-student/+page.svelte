@@ -37,8 +37,8 @@
     pictureId?: string;
     pictureUrl?: string;
     course: string;
-    yearLevel?: string;
-    section?: string;
+    yearLevelId?: string;
+    sectionId?: string;
     guardian?: string;
     guardianPhone?: string;
     mother?: string;
@@ -46,6 +46,7 @@
     nationality?: string;
     religion?: string;
     civilStatus?: string;
+    [key: string]: unknown;
   };
 
   let form: Student = {
@@ -69,8 +70,8 @@
     pictureId: '',
     pictureUrl: '',
     course: '',
-    yearLevel: '',
-    section: '',
+    yearLevelId: '',
+    sectionId: '',
     guardian: '',
     guardianPhone: '',
     mother: '',
@@ -97,6 +98,36 @@
 
   let selectedProvince = '';
   let selectedCity = '';
+
+  // Add a mapping for course code to courseId (replace with real IDs from your DB)
+  const courseCodeToId = {
+    "BSBA-MM": "course-id-1",
+    "BSBA-FM": "course-id-2",
+    "BSCS": "course-id-3",
+    "BSCrim": "course-id-4",
+    "BPEd": "course-id-5",
+    "BSEd-Filipino": "course-id-6",
+    "BSEd-English": "course-id-7",
+    "BSEd-Math": "course-id-8",
+    "BSEd-Science": "course-id-9",
+    "BSEd-TLE-IA": "course-id-10",
+    "BSEd-TLE-HE": "course-id-11",
+    "BEEd": "course-id-12",
+    "BSTrM": "course-id-13"
+  };
+
+  // Add mappings for year levels and sections (replace with real data from your DB)
+  const yearLevels = [
+    { id: 'year-1', name: '1st Year' },
+    { id: 'year-2', name: '2nd Year' },
+    { id: 'year-3', name: '3rd Year' },
+    { id: 'year-4', name: '4th Year' }
+  ];
+  const sections = [
+    { id: 'section-1', name: 'A' },
+    { id: 'section-2', name: 'B' }
+    // ...fetch from DB in real app...
+  ];
 
   function toggleSidebar() {
     sidebarOpen = !sidebarOpen;
@@ -145,8 +176,18 @@
     success = '';
     isSubmitting = true;
 
-    if (!form.studNo || !form.firstName || !form.lastName || !form.course) {
-      error = 'Please fill in all required fields.';
+    // List of required fields and their display names
+    const requiredFields = [
+      { key: 'studNo', label: 'Student Number' },
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'course', label: 'Course' }
+    ];
+
+    // Find missing fields
+    const missing = requiredFields.filter(f => !form[f.key]);
+    if (missing.length > 0) {
+      error = `Please fill in the following required field(s): ${missing.map(f => f.label).join(', ')}`;
       isSubmitting = false;
       return;
     }
@@ -162,16 +203,44 @@
       }
     }
 
-    // 2. Submit student with photo info
+    // 2. Prepare payload for API (match backend schema)
+    const payload = {
+      studNo: form.studNo,
+      firstName: form.firstName,
+      middleName: form.middleName || null,
+      lastName: form.lastName,
+      gender: form.gender || null,
+      age: form.age ? Number(form.age) : null,
+      birthDate: form.birthDate || null,
+      birthPlace: form.birthPlace || null,
+      address: form.address || null,
+      houseNo: form.houseNo || null,
+      street: form.street || null,
+      barangay: form.barangay || null,
+      city: form.city || null,
+      province: form.province || null,
+      zipCode: form.zipCode || null,
+      contactNumber: form.contactNumber || null,
+      email: form.email || null,
+      pictureId: form.pictureId || null,
+      pictureUrl: form.pictureUrl || null,
+      course: form.course,
+      yearLevel: form.yearLevel || null,
+      section: form.section || null,
+      guardian: form.guardian || null,
+      guardianPhone: form.guardianPhone || null,
+      mother: form.mother || null,
+      father: form.father || null,
+      nationality: form.nationality || null,
+      religion: form.religion || null,
+      civilStatus: form.civilStatus || null
+    };
+
     try {
       const res = await fetch('/api/students/add_student', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          pictureId: photoResult.pictureId,
-          pictureUrl: photoResult.pictureUrl
-        })
+        body: JSON.stringify(payload)
       });
 
       const responseData = await res.json();
@@ -204,8 +273,8 @@
         pictureId: '',
         pictureUrl: '',
         course: '',
-        yearLevel: '',
-        section: '',
+        yearLevelId: '',
+        sectionId: '',
         guardian: '',
         guardianPhone: '',
         mother: '',

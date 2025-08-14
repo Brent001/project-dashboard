@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import Sidebar from '$lib/component/Sidebar.svelte';
   import Navbar from '$lib/component/Navbar.svelte';
   import { fly } from 'svelte/transition';
   import { formatDistanceToNow } from 'date-fns';
   import { browser } from '$app/environment';
-  import { decrypt } from '$lib/client/crypto';
+  import { decrypt } from '$lib/client/crypto.js';
 
   export let data;
 
@@ -18,8 +19,8 @@
     pictureId?: string | null;
     pictureUrl?: string | null;
     isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: string;
+    updatedAt: string;
   };
 
   const { staffId, staffName, role, pictureUrl, encryptedData } = data as {
@@ -193,7 +194,13 @@
   <!-- Sidebar overlay for mobile with fly animation -->
   {#if sidebarOpen}
     <div class="fixed inset-0 z-40 flex md:hidden">
-      <div class="fixed inset-0 bg-black opacity-40" on:click={closeSidebar}></div>
+      <div
+        class="fixed inset-0 bg-black opacity-40"
+        role="button"
+        tabindex="0"
+        on:click={closeSidebar}
+        on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') closeSidebar(); }}
+      ></div>
       <div
         class="relative z-50 w-64 h-full bg-white dark:bg-gray-900 transition-all duration-300"
         transition:fly={{ x: -300, duration: 300 }}
@@ -238,7 +245,7 @@
         </div>
       {/if}
 
-      <!-- Header Section with Stats -->
+      <!-- Header Section with Stats and Add Staff Button -->
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div>
           <h1 class="text-2xl md:text-3xl font-bold text-blue-900 dark:text-white">Staff Management</h1>
@@ -254,9 +261,8 @@
             </p>
           </div>
         </div>
-        
-        <!-- Quick Stats Cards -->
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+          <!-- Quick Stats Cards -->
           <div class="bg-white dark:bg-gray-800 rounded-lg px-3 py-2 shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="text-xs text-gray-500 dark:text-gray-400">Total Staff</div>
             <div class="text-lg font-bold text-gray-900 dark:text-white">{staffList.length}</div>
@@ -265,6 +271,14 @@
             <div class="text-xs text-gray-500 dark:text-gray-400">Active</div>
             <div class="text-lg font-bold text-green-600">{activeStaffCount}</div>
           </div>
+          <!-- Add Staff Button -->
+          <button
+            class="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+            on:click={() => goto('/staff/add_staff')}
+            type="button"
+          >
+            + Add Staff
+          </button>
         </div>
       </div>
 
