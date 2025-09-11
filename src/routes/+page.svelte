@@ -11,6 +11,11 @@
 
   // Initialize dark mode from localStorage or system preference
   onMount(() => {
+    // Check if session cookie exists
+    if (document.cookie.split('; ').find(row => row.startsWith('session='))) {
+      goto('/dashboard');
+      return;
+    }
     const savedMode = localStorage.getItem('darkMode');
     if (savedMode) {
       darkMode = JSON.parse(savedMode);

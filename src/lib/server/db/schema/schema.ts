@@ -123,13 +123,18 @@ export const studentSchedule = sqliteTable('student_schedule', {
     status: text('status').notNull().default('Enrolled')
 });
 
-// Individual grade records
+// Individual grade records (per subject per student, with breakdown)
 export const grade = sqliteTable('grade', {
     id: text('id').primaryKey(),
     studNo: text('stud_no').notNull().references(() => student.studNo),
     scheduleId: text('schedule_id').notNull().references(() => schedule.id),
-    score: real('score'),
-    maxScore: real('max_score').notNull()
+    prelim: real('prelim').notNull().default(0),
+    midterm: real('midterm').notNull().default(0),
+    semifinals: real('semifinals').notNull().default(0),
+    finals: real('finals').notNull().default(0),
+    combined: real('combined').notNull().default(0), // e.g. weighted average or sum
+    remarks: text('remarks'), // optional: Passed/Failed/etc.
+    updatedAt: text('updated_at').notNull().default(new Date().toISOString())
 });
 
 // Sessions table
@@ -138,6 +143,17 @@ export const session = sqliteTable('session', {
     userId: text('user_id').notNull(),
     expiresAt: text('expires_at').notNull(),
     createdAt: text('created_at').notNull()
+});
+
+// Logs for admin/staff login activity (for security/audit)
+export const staffLog = sqliteTable('staff_log', {
+    id: text('id').primaryKey(),
+    staffId: text('staff_id').notNull().references(() => staff.id),
+    action: text('action').notNull(), // e.g. 'login', 'logout', 'failed_login'
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    timestamp: text('timestamp').notNull().default(new Date().toISOString()),
+    status: text('status').notNull().default('success') // e.g. 'success', 'failed'
 });
 
 // Type exports (keep as is)
@@ -153,6 +169,7 @@ export type AcademicTerm = typeof academicTerm.$inferSelect;
 export type Schedule = typeof schedule.$inferSelect;
 export type StudentSchedule = typeof studentSchedule.$inferSelect;
 export type Grade = typeof grade.$inferSelect;
+export type StaffLog = typeof staffLog.$inferSelect;
 
 // Insert types
 export type InsertStaff = typeof staff.$inferInsert;
@@ -167,3 +184,4 @@ export type InsertSchedule = typeof schedule.$inferInsert;
 export type InsertStudentSchedule = typeof studentSchedule.$inferInsert;
 export type InsertGrade = typeof grade.$inferInsert;
 export type InsertSession = typeof session.$inferInsert;
+export type InsertStaffLog = typeof staffLog.$inferInsert;

@@ -1,0 +1,617 @@
+<script lang="ts">
+  import Sidebar from '$lib/component/Sidebar.svelte';
+  import Navbar from '$lib/component/Navbar.svelte';
+  import { fly } from 'svelte/transition';
+  import { onMount } from 'svelte';
+
+  export let data;
+
+  type Grade = {
+    id: string;
+    studNo: string;
+    scheduleId: string;
+    prelim: number;
+    midterm: number;
+    semifinals: number;
+    finals: number;
+    combined: number;
+    remarks?: string;
+    updatedAt: string;
+    // Joined data
+    studentName?: string;
+    subjectCode?: string;
+    subjectName?: string;
+    course?: string;
+    yearLevel?: string;
+    section?: string;
+    teacherName?: string;
+    academicTerm?: string;
+  };
+
+  // Only destructure what you need from data, NOT grades
+  let {
+    staffId,
+    staffName,
+    role,
+    pictureUrl,
+    subjects = [],
+    students = [],
+    academicTerms = []
+  } = data as {
+    staffId: string;
+    staffName: string;
+    role: string;
+    pictureUrl: string | null;
+    subjects?: any[];
+    students?: any[];
+    academicTerms?: any[];
+  };
+  
+  let sidebarOpen = false;
+  let sidebarCollapsed = true;
+  let filterDrawerOpen = false;
+  let gradeEntryModalOpen = false;
+  let searchQuery = '';
+  let viewMode = 'table'; // 'table' or 'grid'
+
+  // Filter state
+  let selectedSubject = '';
+  let selectedCourse = '';
+  let selectedYear = '';
+  let selectedSection = '';
+  let selectedTerm = '';
+  let selectedRemarks = '';
+
+  // Grade entry state
+  let selectedGrade: Grade | null = null;
+  let isEditMode = false;
+
+  // Use grades from API only
+  let grades: Grade[] = [];
+
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/grade');
+      const json = await res.json();
+      grades = json.grades ?? [];
+    } catch (e) {
+      grades = [];
+    }
+  });
+
+  // Generate filter options from grades data
+  let subjectOptions = Array.from(new Set(grades.map((g) => g.subjectCode))).filter(Boolean);
+  let courses = Array.from(new Set(grades.map((g) => g.course))).filter(Boolean);
+  let years = Array.from(new Set(grades.map((g) => g.yearLevel))).filter(Boolean);
+  let sections = Array.from(new Set(grades.map((g) => g.section))).filter(Boolean);
+  let terms = Array.from(new Set(grades.map((g) => g.academicTerm))).filter(Boolean);
+  let remarksOptions = Array.from(new Set(grades.map((g) => g.remarks))).filter(Boolean);
+
+  $: filteredGrades = grades.filter((g: Grade) => {
+    const matchesSearch = g.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         g.studNo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         g.subjectCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         g.subjectName?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSubject = !selectedSubject || g.subjectCode === selectedSubject;
+    const matchesCourse = !selectedCourse || g.course === selectedCourse;
+    const matchesYear = !selectedYear || g.yearLevel === selectedYear;
+    const matchesSection = !selectedSection || g.section === selectedSection;
+    const matchesTerm = !selectedTerm || g.academicTerm === selectedTerm;
+    const matchesRemarks = !selectedRemarks || g.remarks === selectedRemarks;
+    
+    return matchesSearch && matchesSubject && matchesCourse && matchesYear && matchesSection && matchesTerm && matchesRemarks;
+  });
+
+  function toggleSidebar() {
+    sidebarOpen = !sidebarOpen;
+  }
+  function toggleSidebarCollapsed() {
+    sidebarCollapsed = !sidebarCollapsed;
+  }
+  function closeSidebar() {
+    sidebarOpen = false;
+  }
+  function openFilterDrawer() {
+    filterDrawerOpen = true;
+  }
+  function closeFilterDrawer() {
+    filterDrawerOpen = false;
+  }
+  function resetFilters() {
+    selectedSubject = '';
+    selectedCourse = '';
+    selectedYear = '';
+    selectedSection = '';
+    selectedTerm = '';
+    selectedRemarks = '';
+    searchQuery = '';
+  }
+
+  function openGradeEntry(grade: Grade | null = null) {
+    selectedGrade = grade;
+    isEditMode = grade !== null;
+    gradeEntryModalOpen = true;
+  }
+
+  function closeGradeEntry() {
+    gradeEntryModalOpen = false;
+    selectedGrade = null;
+    isEditMode = false;
+  }
+
+  function getGradeStatus(combined: number): { color: string; text: string } {
+    if (combined >= 75) return { color: 'green', text: 'Passed' };
+    if (combined >= 60) return { color: 'yellow', text: 'Conditional' };
+    return { color: 'red', text: 'Failed' };
+  }
+
+  function calculateGPA(grades: Grade[]): number {
+    if (grades.length === 0) return 0;
+    const total = grades.reduce((sum, grade) => sum + grade.combined, 0);
+    return Math.round((total / grades.length) * 100) / 100;
+  }
+</script>
+
+<div class="flex h-screen bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-950 dark:to-gray-900">
+  <!-- Sidebar for desktop -->
+  <aside class="hidden md:block">
+    <div class={`transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
+      <Sidebar
+        {staffId}
+        {staffName}
+        {role}
+        {closeSidebar}
+        {sidebarCollapsed}
+        pictureUrl={pictureUrl ?? undefined}
+      />
+    </div>
+  </aside>
+  
+  <!-- Sidebar overlay for mobile with fly animation -->
+  {#if sidebarOpen}
+    <div class="fixed inset-0 z-40 flex md:hidden">
+      <div class="fixed inset-0 bg-black opacity-40" on:click={closeSidebar}></div>
+      <div
+        class="relative z-50 w-64 h-full bg-white dark:bg-gray-900 transition-all duration-300"
+        transition:fly={{ x: -300, duration: 300 }}
+        on:click|stopPropagation
+      >
+        <Sidebar
+          {staffId}
+          {staffName}
+          {role}
+          {closeSidebar}
+          sidebarCollapsed={false}
+          pictureUrl={pictureUrl ?? undefined}
+        />
+      </div>
+    </div>
+  {/if}
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <Navbar
+      {staffId}
+      {staffName}
+      {role}
+      {sidebarOpen}
+      {toggleSidebar}
+      {sidebarCollapsed}
+      {toggleSidebarCollapsed}
+      pictureUrl={pictureUrl ?? undefined}
+    />
+
+    <main class="flex-1 overflow-y-auto px-4 md:px-8 py-6">
+      <!-- Header Section -->
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold text-blue-900 dark:text-white">Grade Management</h1>
+          <p class="text-blue-600 dark:text-blue-400 mt-1">{filteredGrades.length} grade records found</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button 
+             class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+             on:click={() => openGradeEntry()}>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            Add Grade
+          </button>
+          <button
+            class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Export Grades
+          </button>
+          <button
+            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+            on:click={() => viewMode = viewMode === 'table' ? 'grid' : 'table'}
+          >
+            {#if viewMode === 'table'}
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+              </svg>
+              Grid View
+            {:else}
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+              </svg>
+              Table View
+            {/if}
+          </button>
+        </div>
+      </div>
+
+      <!-- Search and Filter Section -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
+        <div class="flex flex-col md:flex-row gap-4">
+          <!-- Search Bar -->
+          <div class="flex-1 relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Search by student name, ID, or subject..."
+              bind:value={searchQuery}
+              class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          
+          <!-- Filter Button for Mobile -->
+          <button
+            class="md:hidden inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            on:click={openFilterDrawer}
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17a1 1 0 01-.293.707L9 20.414A1 1 0 018 20v-4.586a1 1 0 00-.293-.707L1.293 7.293A1 1 0 011 6.586V4z"/>
+            </svg>
+            Filters
+          </button>
+          
+          <!-- Desktop Filters -->
+          <div class="hidden md:flex gap-3">
+            <div class="relative w-full">
+              <select
+                bind:value={selectedSubject}
+                class="appearance-none w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+              >
+                <option value="">All Subjects</option>
+                {#each subjectOptions as subject}
+                  <option value={subject}>{subject}</option>
+                {/each}
+              </select>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </span>
+            </div>
+            <div class="relative w-full">
+              <select
+                bind:value={selectedCourse}
+                class="appearance-none w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+              >
+                <option value="">All Courses</option>
+                {#each courses as course}
+                  <option value={course}>{course}</option>
+                {/each}
+              </select>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </span>
+            </div>
+            <div class="relative w-full">
+              <select
+                bind:value={selectedTerm}
+                class="appearance-none w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+              >
+                <option value="">All Terms</option>
+                {#each terms as term}
+                  <option value={term}>{term}</option>
+                {/each}
+              </select>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </span>
+            </div>
+            <button
+              class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              on:click={resetFilters}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Drawer for Mobile -->
+      {#if filterDrawerOpen}
+        <div class="fixed inset-0 z-50 md:hidden">
+          <div class="fixed inset-0 bg-black/50" on:click={closeFilterDrawer}></div>
+          <div class="fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-900 shadow-xl p-6 overflow-y-auto"
+               transition:fly={{ x: 300, duration: 300 }}
+               on:click|stopPropagation>
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="text-xl font-semibold text-blue-900 dark:text-white">Filters</h2>
+              <button on:click={closeFilterDrawer} class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <div class="space-y-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject</label>
+                <select bind:value={selectedSubject} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                  <option value="">All Subjects</option>
+                  {#each subjectOptions as subject}
+                    <option value={subject}>{subject}</option>
+                  {/each}
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Course</label>
+                <select bind:value={selectedCourse} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                  <option value="">All Courses</option>
+                  {#each courses as course}
+                    <option value={course}>{course}</option>
+                  {/each}
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Academic Term</label>
+                <select bind:value={selectedTerm} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                  <option value="">All Terms</option>
+                  {#each terms as term}
+                    <option value={term}>{term}</option>
+                  {/each}
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                <select bind:value={selectedRemarks} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                  <option value="">All Status</option>
+                  <option value="Passed">Passed</option>
+                  <option value="Failed">Failed</option>
+                  <option value="Conditional">Conditional</option>
+                </select>
+              </div>
+              <button
+                class="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                on:click={() => { resetFilters(); closeFilterDrawer(); }}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Content Area -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+        {#if viewMode === 'table'}
+          <!-- Table View -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subject</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Prelim</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Midterm</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Semis</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Finals</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Final Grade</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {#if filteredGrades.length === 0}
+                  <tr>
+                    <td colspan="9" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <p class="text-lg font-medium">No grades found</p>
+                        <p class="text-sm">Try adjusting your search or filters</p>
+                      </div>
+                    </td>
+                  </tr>
+                {:else}
+                  {#each filteredGrades as grade}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                          <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                            <span class="text-blue-600 dark:text-blue-400 font-medium">
+                              {grade.studentName?.split(' ').map(n => n[0]).join('') || 'UN'}
+                            </span>
+                          </div>
+                          <div class="ml-4">
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">{grade.studentName || 'Unknown'}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">{grade.studNo}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">{grade.subjectCode}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">{grade.subjectName}</div>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{grade.prelim}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{grade.midterm}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{grade.semifinals}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{grade.finals}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{grade.combined}</td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        {#if getGradeStatus(grade.combined).color === 'green'}
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                            {getGradeStatus(grade.combined).text}
+                          </span>
+                        {:else if getGradeStatus(grade.combined).color === 'yellow'}
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
+                            {getGradeStatus(grade.combined).text}
+                          </span>
+                        {:else}
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
+                            {getGradeStatus(grade.combined).text}
+                          </span>
+                        {/if}
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <div class="flex items-center gap-2">
+                          <button class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                                  on:click={() => openGradeEntry(grade)}>
+                            Edit
+                          </button>
+                          <button class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 font-medium">
+                            View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  {/each}
+                {/if}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <!-- Grid View -->
+          <div class="p-6">
+            {#if filteredGrades.length === 0}
+              <div class="text-center py-12">
+                <svg class="w-12 h-12 mb-4 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <p class="text-lg font-medium text-gray-500 dark:text-gray-400">No grades found</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Try adjusting your search or filters</p>
+              </div>
+            {:else}
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {#each filteredGrades as grade}
+                  <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center mb-3">
+                      <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                        <span class="text-blue-600 dark:text-blue-400 font-medium text-lg">
+                          {grade.studentName?.split(' ').map(n => n[0]).join('') || 'UN'}
+                        </span>
+                      </div>
+                      <div class="ml-3">
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white">{grade.studentName || 'Unknown'}</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{grade.studNo}</p>
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Subject:</span>
+                        <span class="text-xs font-medium text-gray-900 dark:text-white">{grade.subjectName}</span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Course:</span>
+                        <span class="text-xs font-medium text-gray-900 dark:text-white">{grade.course}</span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Term:</span>
+                        <span class="text-xs font-medium text-gray-900 dark:text-white">{grade.academicTerm}</span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Section:</span>
+                        <span class="text-xs font-medium text-gray-900 dark:text-white">{grade.section}</span>
+                      </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-2">
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Prelim</div>
+                      <div class="text-xs font-semibold text-gray-900 dark:text-white">{grade.prelim}</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Midterm</div>
+                      <div class="text-xs font-semibold text-gray-900 dark:text-white">{grade.midterm}</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Semis</div>
+                      <div class="text-xs font-semibold text-gray-900 dark:text-white">{grade.semifinals}</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Finals</div>
+                      <div class="text-xs font-semibold text-gray-900 dark:text-white">{grade.finals}</div>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between">
+                      <span class="text-xs text-gray-500 dark:text-gray-400">Final Grade:</span>
+                      <span class="text-sm font-bold text-blue-900 dark:text-blue-300">{grade.combined}</span>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between">
+                      <span class="text-xs text-gray-500 dark:text-gray-400">Status:</span>
+                      {#if getGradeStatus(grade.combined).color === 'green'}
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                          {getGradeStatus(grade.combined).text}
+                        </span>
+                      {:else if getGradeStatus(grade.combined).color === 'yellow'}
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
+                          {getGradeStatus(grade.combined).text}
+                        </span>
+                      {:else}
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
+                          {getGradeStatus(grade.combined).text}
+                        </span>
+                      {/if}
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                      <button class="flex-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                              on:click={() => openGradeEntry(grade)}>
+                        Edit
+                      </button>
+                      <button class="flex-1 px-3 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">
+                        View
+                      </button>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <!-- GPA and Stats Section -->
+      <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <h3 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Class GPA</h3>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-600 dark:text-gray-400">Average GPA</span>
+            <span class="text-sm font-bold text-blue-900 dark:text-blue-300">{calculateGPA(filteredGrades)}</span>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <h3 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Recent Grade Updates</h3>
+          <div class="space-y-3">
+            {#each filteredGrades.slice(0,3) as grade}
+              <div class="flex items-start gap-3">
+                <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                <div>
+                  <p class="text-sm text-gray-900 dark:text-white">{grade.studentName} updated {grade.subjectName}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">{grade.updatedAt}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <h3 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Announcements</h3>
+          <div class="space-y-3">
+            <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p class="text-sm text-gray-900 dark:text-white">Grade submission deadline: Friday</p>
+              <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">Important</p>
+            </div>
+            <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <p class="text-sm text-gray-900 dark:text-white">Final exams next week</p>
+              <p class="text-xs text-green-600 dark:text-green-400 mt-1">Reminder</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
