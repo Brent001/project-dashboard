@@ -25,13 +25,13 @@ export const GET = async ({ url, cookies }) => {
       pictureUrl: staff.pictureUrl
     }).from(staff).where(eq(staff.id, id)).get();
 
-    if (!user || !user.pictureUrl) {
-      return json({ error: 'Not found' }, { status: 404 });
-    }
+    // Always return a valid pictureUrl, fallback to default if missing
+    return json({
+      pictureUrl: user?.pictureUrl || '/default-avatar.jpg'
+    }, { status: 200 });
 
-    return json({ pictureUrl: user.pictureUrl });
   } catch (error) {
     if (error instanceof Response) return error;
-    return json({ error: 'Failed to fetch profile picture' }, { status: 500 });
+    return json({ pictureUrl: '/default-avatar.jpg' }, { status: 200 });
   }
 };

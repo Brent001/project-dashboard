@@ -285,7 +285,7 @@
       };
       previewUrl = '';
       if (fileInput) fileInput.value = '';
-      setTimeout(() => goto('/students'), 1500);
+      setTimeout(() => goto('/dashboard/students'), 1500);
     } catch (e) {
       error = 'Failed to add student. Please try again.';
     } finally {
@@ -433,7 +433,7 @@
                   <button 
                     type="button"
                     class="btn btn-secondary inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg shadow-sm bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 min-w-[120px] transition-all duration-200"
-                    on:click={() => goto('/students')}
+                    on:click={() => goto('/dashboard/students')}
                     disabled={isSubmitting}
                   >
                     Cancel

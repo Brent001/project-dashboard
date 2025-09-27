@@ -24,13 +24,15 @@
           }
         })
         .catch(() => {
-          resolvedPictureUrl = '/default-avatar.png';
+          resolvedPictureUrl = '/default-avatar.jpg';
         });
+    } else {
+      resolvedPictureUrl = pictureUrl || '/default-avatar.jpg';
     }
   });
 
   function handleImgError() {
-    resolvedPictureUrl = '/default-avatar.png';
+    resolvedPictureUrl = '/default-avatar.jpg';
   }
 
   async function handleLogout() {
@@ -38,14 +40,15 @@
     window.location.href = '/';
   }
 
-  // Add new menu items for Logs and Grades
+  // Add new menu item for Subjects
   const menuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z M3 7l9 6 9-6' },
     { href: '/dashboard/students', label: 'Students', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z' },
     { href: '/dashboard/schedules', label: 'Schedules', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { href: '/dashboard/subjects', label: 'Subjects', icon: 'M19 11H5m14 0a2 2 0 01-2 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2v-6a2 2 0 012-2m12 0V7a2 2 0 00-2-2H7a2 2 0 00-2 2v4' }, // <-- Added Subjects button
     { href: '/dashboard/staff', label: 'Staff', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
-    { href: '/dashboard/logs', label: 'Logs', icon: 'M9 17v-2a4 4 0 018 0v2M9 17H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2M9 17v2a2 2 0 002 2h2a2 2 0 002-2v-2' }, // Login logs icon
-    { href: '/dashboard/grades', label: 'Grades', icon: 'M5 13l4 4L19 7M5 7h14v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7z' }, // Grades icon
+    { href: '/dashboard/logs', label: 'Logs', icon: 'M9 17v-2a4 4 0 018 0v2M9 17H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2M9 17v2a2 2 0 002 2h2a2 2 0 002-2v-2' },
+    { href: '/dashboard/grades', label: 'Grades', icon: 'M5 13l4 4L19 7M5 7h14v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7z' },
     { href: '/dashboard/settings', label: 'Settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' }
   ];
 
@@ -78,10 +81,17 @@
       </svg>
     </button>
     <div class="flex items-center space-x-3 mb-4">
-      <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-        </svg>
+      <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+        {#if resolvedPictureUrl && resolvedPictureUrl !== '/default-avatar.jpg'}
+          <img
+            src={resolvedPictureUrl}
+            alt="Profile"
+            class="w-10 h-10 object-cover rounded-xl"
+            on:error={handleImgError}
+          />
+        {:else}
+          <span class="text-white font-bold text-lg">{getInitials(staffName)}</span>
+        {/if}
       </div>
       {#if !sidebarCollapsed}
         <div class="transition-opacity duration-300 opacity-100">

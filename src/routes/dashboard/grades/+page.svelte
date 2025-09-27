@@ -35,7 +35,7 @@
     role,
     pictureUrl,
     subjects = [],
-    students = [],
+    students: initialStudents = [],
     academicTerms = []
   } = data as {
     staffId: string;
@@ -69,6 +69,11 @@
   // Use grades from API only
   let grades: Grade[] = [];
 
+  // Students data (rename to avoid conflict)
+  let studentList = [];
+  let studentsLoading = true;
+  let studentsError = '';
+
   onMount(async () => {
     try {
       const res = await fetch('/api/grade');
@@ -77,6 +82,20 @@
     } catch (e) {
       grades = [];
     }
+  });
+
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/students');
+      if (res.ok) {
+        studentList = await res.json();
+      } else {
+        studentsError = 'Failed to fetch students';
+      }
+    } catch (e) {
+      studentsError = 'Network error';
+    }
+    studentsLoading = false;
   });
 
   // Generate filter options from grades data
@@ -150,6 +169,13 @@
     const total = grades.reduce((sum, grade) => sum + grade.combined, 0);
     return Math.round((total / grades.length) * 100) / 100;
   }
+
+  // After fetching studentList
+  $: displayStudents = (studentList ?? []).map((s) => ({
+    ...s,
+    name: `${s.firstName} ${s.lastName}`,
+    year: s.yearLevel ?? ''
+  }));
 </script>
 
 <div class="flex h-screen bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-950 dark:to-gray-900">
@@ -612,6 +638,25 @@
           </div>
         </div>
       </div>
+
+      <!-- Student List Section -->
+      {#if studentsLoading}
+        <div>Loading students...</div>
+      {:else if studentsError}
+        <div class="text-red-600">{studentsError}</div>
+      {:else}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
+          <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Student List</h2>
+          <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+            {#each students as student}
+              <li class="py-2 flex justify-between items-center">
+                <span>{student.firstName} {student.lastName} ({student.studNo})</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{student.course} - {student.yearLevel} {student.section}</span>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
     </main>
   </div>
 </div>

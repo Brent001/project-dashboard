@@ -45,6 +45,12 @@ export const actions: Actions = {
             }
         }
 
+        // If no picture uploaded, use default avatar
+        if (!pictureUrl) {
+            pictureUrl = '/default-avatar.jpg';
+            pictureId = null;
+        }
+
         const { Argon2id } = await import('oslo/password');
         const hashedPassword = await new Argon2id().hash(password);
 

@@ -52,12 +52,13 @@ export const section = sqliteTable('section', {
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true)
 });
 
-// Subjects/Courses catalog
+// Subjects/Courses catalog WITH academicTermId
 export const subject = sqliteTable('subject', {
     id: text('id').primaryKey(),
     code: text('code').notNull().unique(),
     name: text('name').notNull(),
-    units: integer('units').notNull().default(3),
+    units: integer('units').notNull(),
+    yearLevelId: text('year_level_id').notNull(),       // No .references()
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true)
 });
 
@@ -116,24 +117,18 @@ export const schedule = sqliteTable('schedule', {
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true)
 });
 
-// Student enrollment in schedules
-export const studentSchedule = sqliteTable('student_schedule', {
-    studNo: text('stud_no').notNull().references(() => student.studNo),
-    scheduleId: text('schedule_id').notNull().references(() => schedule.id),
-    status: text('status').notNull().default('Enrolled')
-});
-
-// Individual grade records (per subject per student, with breakdown)
+// Grade records - One per student, with enrolledSubjects as a comma-separated string
 export const grade = sqliteTable('grade', {
     id: text('id').primaryKey(),
     studNo: text('stud_no').notNull().references(() => student.studNo),
-    scheduleId: text('schedule_id').notNull().references(() => schedule.id),
-    prelim: real('prelim').notNull().default(0),
-    midterm: real('midterm').notNull().default(0),
-    semifinals: real('semifinals').notNull().default(0),
-    finals: real('finals').notNull().default(0),
-    combined: real('combined').notNull().default(0), // e.g. weighted average or sum
-    remarks: text('remarks'), // optional: Passed/Failed/etc.
+    enrolledSubjects: text('enrolled_subjects').notNull(), // Comma-separated subject IDs
+    prelim: real('prelim').default(0),
+    midterm: real('midterm').default(0),
+    semifinals: real('semifinals').default(0),
+    finals: real('finals').default(0),
+    combined: real('combined').default(0),
+    remarks: text('remarks'),
+    createdAt: text('created_at').notNull().default(new Date().toISOString()),
     updatedAt: text('updated_at').notNull().default(new Date().toISOString())
 });
 
@@ -156,6 +151,17 @@ export const staffLog = sqliteTable('staff_log', {
     status: text('status').notNull().default('success') // e.g. 'success', 'failed'
 });
 
+// Settings table for account preferences
+export const settings = sqliteTable('settings', {
+    id: text('id').primaryKey(),
+    staffId: text('staff_id').notNull().references(() => staff.id),
+    theme: text('theme').notNull().default('system'), // 'dark', 'light', 'system'
+    language: text('language').notNull().default('en'), // e.g. 'en', 'fil', etc.
+    notifications: integer('notifications', { mode: 'boolean' }).notNull().default(true),
+    createdAt: text('created_at').notNull().default(new Date().toISOString()),
+    updatedAt: text('updated_at').notNull().default(new Date().toISOString())
+});
+
 // Type exports (keep as is)
 export type Session = typeof staff.$inferSelect;
 export type Staff = typeof staff.$inferSelect;
@@ -167,9 +173,9 @@ export type Subject = typeof subject.$inferSelect;
 export type Curriculum = typeof curriculum.$inferSelect;
 export type AcademicTerm = typeof academicTerm.$inferSelect;
 export type Schedule = typeof schedule.$inferSelect;
-export type StudentSchedule = typeof studentSchedule.$inferSelect;
 export type Grade = typeof grade.$inferSelect;
 export type StaffLog = typeof staffLog.$inferSelect;
+export type Settings = typeof settings.$inferSelect;
 
 // Insert types
 export type InsertStaff = typeof staff.$inferInsert;
@@ -181,7 +187,7 @@ export type InsertSubject = typeof subject.$inferInsert;
 export type InsertCurriculum = typeof curriculum.$inferInsert;
 export type InsertAcademicTerm = typeof academicTerm.$inferInsert;
 export type InsertSchedule = typeof schedule.$inferInsert;
-export type InsertStudentSchedule = typeof studentSchedule.$inferInsert;
 export type InsertGrade = typeof grade.$inferInsert;
 export type InsertSession = typeof session.$inferInsert;
 export type InsertStaffLog = typeof staffLog.$inferInsert;
+export type InsertSettings = typeof settings.$inferInsert;

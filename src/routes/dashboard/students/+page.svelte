@@ -2,6 +2,7 @@
   import Sidebar from '$lib/component/Sidebar.svelte';
   import Navbar from '$lib/component/Navbar.svelte';
   import { fly } from 'svelte/transition';
+  import { onMount } from 'svelte';
 
   export let data;
 
@@ -24,6 +25,7 @@
     yearLevel?: string;
     name?: string;
     year?: string;
+    showActions?: boolean;
   };
 
   let { staffId, staffName, role, pictureUrl, students } = data as {
@@ -49,7 +51,8 @@
   students = (students ?? []).map((s) => ({
     ...s,
     name: `${s.firstName} ${s.lastName}`,
-    year: s.yearLevel ?? ''
+    year: s.yearLevel ?? '',
+    showActions: false
   }));
 
   // Generate filter options from students data
@@ -88,6 +91,57 @@
     selectedSection = '';
     searchQuery = '';
   }
+
+  // Toggle actions dropdown for a specific student
+  function toggleActions(studentIndex: number, event: Event) {
+    event.stopPropagation();
+    // Close all other dropdowns first
+    students.forEach((s, i) => {
+      if (i !== studentIndex) {
+        s.showActions = false;
+      }
+    });
+    // Toggle the clicked one
+    students[studentIndex].showActions = !students[studentIndex].showActions;
+    students = students; // Trigger reactivity
+  }
+
+  // Close all dropdowns when clicking outside
+  onMount(() => {
+    const closeAll = () => {
+      students.forEach(s => s.showActions = false);
+      students = students; // Trigger reactivity
+    };
+    const handler = (e: Event) => {
+      // Don't close if clicking on an action button or dropdown
+      const target = e.target as HTMLElement;
+      if (!target.closest('.actions-container')) {
+        closeAll();
+      }
+    };
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  });
+
+  // Action handlers
+  function viewStudent(studNo: string) {
+    window.location.href = `/dashboard/students/view?id=${studNo}`;
+  }
+
+  function editStudent(studNo: string) {
+    window.location.href = `/dashboard/students/edit?id=${studNo}`;
+  }
+
+  function addGrade(studNo: string, name: string) {
+    window.location.href = `/dashboard/students/add_grades?studNo=${studNo}&name=${encodeURIComponent(name)}`;
+  }
+
+  function deleteStudent(studNo: string, name: string) {
+    if (confirm(`Are you sure you want to delete ${name}?`)) {
+      // Handle delete logic here
+      console.log('Deleting student:', studNo);
+    }
+  }
 </script>
 
 <div class="flex h-screen bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-950 dark:to-gray-900">
@@ -101,7 +155,7 @@
   <!-- Sidebar overlay for mobile with fly animation -->
   {#if sidebarOpen}
     <div class="fixed inset-0 z-40 flex md:hidden">
-      <div class="fixed inset-0 bg-black opacity-40" on:click={closeSidebar}></div>
+      <div class="fixed inset-0 bg-black opacity-40" role="button" tabindex="0" aria-label="Close sidebar overlay" on:click={closeSidebar} on:keydown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') closeSidebar(); }}></div>
       <div
         class="relative z-50 w-64 h-full bg-white dark:bg-gray-900 transition-all duration-300"
         transition:fly={{ x: -300, duration: 300 }}
@@ -132,7 +186,7 @@
           <p class="text-blue-600 dark:text-blue-400 mt-1">{filteredStudents.length} students found</p>
         </div>
         <div class="flex flex-wrap gap-3">
-          <a href="/students/add-student" 
+          <a href="/dashboard/students/add-student" 
              class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -189,7 +243,6 @@
           
           <!-- Desktop Filters -->
           <div class="hidden md:flex gap-3">
-            <!-- Replace your <select> blocks with this custom dropdown markup -->
             <div class="relative w-full">
               <select
                 bind:value={selectedCourse}
@@ -302,77 +355,128 @@
         </div>
       {/if}
 
-      <!-- Content Area -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <!-- Content Area with proper overflow handling -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
         {#if viewMode === 'table'}
-          <!-- Table View -->
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
-                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student ID</th>
-                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Course</th>
-                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Year</th>
-                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Section</th>
-                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {#if filteredStudents.length === 0}
+          <!-- Table View with proper container -->
+          <div class="overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      <div class="flex flex-col items-center">
-                        <svg class="w-12 h-12 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
-                        </svg>
-                        <p class="text-lg font-medium">No students found</p>
-                        <p class="text-sm">Try adjusting your search or filters</p>
-                      </div>
-                    </td>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student ID</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Course</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Year</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Section</th>
+                    <th class="px-6 py-4 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                   </tr>
-                {:else}
-                  {#each filteredStudents as student}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                          <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                            <span class="text-blue-600 dark:text-blue-400 font-medium">
-                              {student.firstName?.charAt(0)}{student.lastName?.charAt(0)}
-                            </span>
-                          </div>
-                          <div class="ml-4">
-                            <div class="text-sm font-medium text-gray-900 dark:text-white">{student.name}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">{student.contactNumber || 'No contact'}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{student.studNo}</td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                          {student.course}
-                        </span>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{student.year}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{student.section || 'N/A'}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm">
-                        <div class="flex items-center gap-2">
-                          <button
-                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-                            on:click={() => window.location.href = `/dashboard/students/view?id=${student.studNo}`}
-                          >
-                            View
-                          </button>
-                          <button class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 font-medium">
-                            Edit
-                          </button>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {#if filteredStudents.length === 0}
+                    <tr>
+                      <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col items-center">
+                          <svg class="w-12 h-12 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                          </svg>
+                          <p class="text-lg font-medium">No students found</p>
+                          <p class="text-sm">Try adjusting your search or filters</p>
                         </div>
                       </td>
                     </tr>
-                  {/each}
-                {/if}
-              </tbody>
-            </table>
+                  {:else}
+                    {#each filteredStudents as student, index}
+                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="flex items-center">
+                            <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                              <span class="text-blue-600 dark:text-blue-400 font-medium">
+                                {student.firstName?.charAt(0)}{student.lastName?.charAt(0)}
+                              </span>
+                            </div>
+                            <div class="ml-4">
+                              <div class="text-sm font-medium text-gray-900 dark:text-white">{student.name}</div>
+                              <div class="text-sm text-gray-500 dark:text-gray-400">{student.contactNumber || 'No contact'}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{student.studNo}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                            {student.course}
+                          </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{student.year}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{student.section || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                          <div class="relative actions-container">
+                            <button
+                              class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                              on:click={(e) => toggleActions(index, e)}
+                              aria-haspopup="true"
+                              aria-expanded={student.showActions ? "true" : "false"}
+                              title="More actions"
+                            >
+                              <svg class="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                              </svg>
+                            </button>
+                            
+                            {#if student.showActions}
+                              <div
+                                class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1"
+                                transition:fly={{ y: -10, duration: 150 }}
+                                style="position: absolute; transform: none;"
+                              >
+                                <button
+                                  class="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  on:click={() => viewStudent(student.studNo)}
+                                >
+                                  <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                  </svg>
+                                  View Details
+                                </button>
+                                <button
+                                  class="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                  on:click={() => editStudent(student.studNo)}
+                                >
+                                  <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                  </svg>
+                                  Edit Student
+                                </button>
+                                <hr class="border-gray-200 dark:border-gray-600 my-1">
+                                <button
+                                  class="flex items-center w-full px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                                  on:click={() => addGrade(student.studNo, student.name)}
+                                >
+                                  <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                                  </svg>
+                                  Add Grade
+                                </button>
+                                <button
+                                  class="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                  on:click={() => deleteStudent(student.studNo, student.name)}
+                                >
+                                  <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                  </svg>
+                                  Delete Student
+                                </button>
+                              </div>
+                            {/if}
+                          </div>
+                        </td>
+                      </tr>
+                    {/each}
+                  {/if}
+                </tbody>
+              </table>
+            </div>
           </div>
         {:else}
           <!-- Grid View -->
@@ -387,16 +491,78 @@
               </div>
             {:else}
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {#each filteredStudents as student}
-                  <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-4 hover:shadow-md transition-shadow">
+                {#each filteredStudents as student, index}
+                  <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-4 hover:shadow-md transition-shadow relative">
+                    <!-- Action dropdown button for grid -->
+                    <div class="absolute top-3 right-3 actions-container">
+                      <button
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        on:click={(e) => toggleActions(index, e)}
+                        aria-haspopup="true"
+                        aria-expanded={student.showActions ? "true" : "false"}
+                        title="More actions"
+                      >
+                        <svg class="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                        </svg>
+                      </button>
+                      
+                      {#if student.showActions}
+                        <div
+                          class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1"
+                          transition:fly={{ y: -10, duration: 150 }}
+                          style="position: absolute; transform: none;"
+                        >
+                          <button
+                            class="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            on:click={() => viewStudent(student.studNo)}
+                          >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            View
+                          </button>
+                          <button
+                            class="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            on:click={() => editStudent(student.studNo)}
+                          >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                            Edit
+                          </button>
+                          <hr class="border-gray-200 dark:border-gray-600 my-1">
+                          <button
+                            class="flex items-center w-full px-3 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                            on:click={() => addGrade(student.studNo, student.name)}
+                          >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                            </svg>
+                            Add Grade
+                          </button>
+                          <button
+                            class="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            on:click={() => deleteStudent(student.studNo, student.name)}
+                          >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
+
                     <div class="flex items-center mb-3">
                       <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                         <span class="text-blue-600 dark:text-blue-400 font-medium text-lg">
                           {student.firstName?.charAt(0)}{student.lastName?.charAt(0)}
                         </span>
                       </div>
-                      <div class="ml-3">
-                        <h3 class="text-sm font-medium text-gray-900 dark:text-white">{student.name}</h3>
+                      <div class="ml-3 flex-1">
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white truncate">{student.name}</h3>
                         <p class="text-xs text-gray-500 dark:text-gray-400">{student.studNo}</p>
                       </div>
                     </div>
@@ -413,14 +579,6 @@
                         <span class="text-xs text-gray-500 dark:text-gray-400">Section:</span>
                         <span class="text-xs font-medium text-gray-900 dark:text-white">{student.section || 'N/A'}</span>
                       </div>
-                    </div>
-                    <div class="mt-4 flex gap-2">
-                      <button class="flex-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                        View
-                      </button>
-                      <button class="flex-1 px-3 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">
-                        Edit
-                      </button>
                     </div>
                   </div>
                 {/each}

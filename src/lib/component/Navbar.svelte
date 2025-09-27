@@ -24,18 +24,18 @@
         if (data && data.pictureUrl) {
           resolvedPictureUrl = data.pictureUrl;
         } else {
-          resolvedPictureUrl = '/default-avatar.png';
+          resolvedPictureUrl = '/default-avatar.jpg';
         }
       })
       .catch(() => {
-        resolvedPictureUrl = '/default-avatar.png';
+        resolvedPictureUrl = '/default-avatar.jpg';
       });
   } else {
-    resolvedPictureUrl = pictureUrl || '/default-avatar.png';
+    resolvedPictureUrl = pictureUrl || '/default-avatar.jpg';
   }
 
   function handleImgError() {
-    resolvedPictureUrl = '/default-avatar.png';
+    resolvedPictureUrl = '/default-avatar.jpg';
   }
 
   async function handleLogout() {
@@ -137,7 +137,7 @@
       >
         <!-- Show initials if no real photo -->
         <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold overflow-hidden">
-          {#if resolvedPictureUrl && resolvedPictureUrl !== '/default-avatar.png'}
+          {#if resolvedPictureUrl && resolvedPictureUrl !== '/default-avatar.jpg'}
             <img
               src={resolvedPictureUrl}
               alt="Profile"
