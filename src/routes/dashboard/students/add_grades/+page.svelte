@@ -1,6 +1,7 @@
 <script lang="ts">
   import Sidebar from '$lib/component/Sidebar.svelte';
   import Navbar from '$lib/component/Navbar.svelte';
+  import AcademicModal from '$lib/component/Academic_modal.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
@@ -44,6 +45,9 @@
   };
   let termModalError = '';
   let termModalSaving = false;
+
+  // Academic modal
+  let showAcademicModal = false;
 
   // Grade row interface
   interface GradeRow {
@@ -398,6 +402,15 @@
   function goBack() {
     goto('/dashboard/students');
   }
+
+  function handleAcademicModalSuccess(newTerm) {
+    showAcademicModal = false;
+    loadAcademicTerms();
+  }
+
+  function handleAcademicModalClose() {
+    showAcademicModal = false;
+  }
 </script>
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -415,16 +428,27 @@
 
   <!-- Mobile Sidebar Overlay -->
   {#if sidebarOpen}
-    <div class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" on:click={closeSidebar}></div>
-    <div class="fixed left-0 top-0 h-full w-64 z-50 md:hidden">
-      <Sidebar 
-        {staffId} 
-        {staffName} 
-        {role} 
-        sidebarCollapsed={false}
-        {closeSidebar}
-        {pictureUrl}
-      />
+    <div class="fixed inset-0 z-40 flex md:hidden">
+      <div
+        class="fixed inset-0 bg-black opacity-40 cursor-pointer"
+        aria-label="Close sidebar overlay"
+        on:click={closeSidebar}
+        on:keydown={(e) => handleKeyDown(e, closeSidebar)}
+      ></div>
+      <div
+        class="relative z-50 w-64 h-full bg-white dark:bg-gray-900 transition-all duration-300"
+        transition:fly={{ x: -300, duration: 300 }}
+        on:click|stopPropagation
+      >
+        <Sidebar 
+          {staffId} 
+          {staffName} 
+          {role} 
+          sidebarCollapsed={false}
+          {closeSidebar}
+          {pictureUrl}
+        />
+      </div>
     </div>
   {/if}
 
@@ -497,15 +521,31 @@
             id="academic-term"
             class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             bind:value={selectedAcademicTermId}
-            on:change={onAcademicTermChange}
+            on:change={(e) => {
+              if (e.target.value === '__add__') {
+                showAcademicModal = true;
+                // Reset selection to previous value
+                selectedAcademicTermId = academicTermId;
+              } else {
+                onAcademicTermChange(e);
+              }
+            }}
           >
             {#each academicTerms as term}
               <option value={term.id}>
                 {term.name} ({term.startDate} - {term.endDate}) {term.isActive ? '[Active]' : ''}
               </option>
             {/each}
+            <option value="__add__">➕ Add Academic Term...</option>
           </select>
         </div>
+
+        <!-- Academic Term Modal -->
+        <AcademicModal
+          isOpen={showAcademicModal}
+          on:success={e => handleAcademicModalSuccess(e.detail)}
+          on:close={handleAcademicModalClose}
+        />
 
         <!-- Excel-style Grade Table -->
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
