@@ -8,7 +8,7 @@
   // Staff info for sidebar/navbar
   let staffId = '';
   let staffName = '';
-  let role = '';
+  let role: string = '';
   let pictureUrl = '';
 
   let sidebarOpen = false;
@@ -20,71 +20,113 @@
   let course = '';
   let yearLevel = '';
   let section = '';
+  let academicTermId = '';
 
-  // Subject management
+  // Subject and grade data
   let allSubjects: any[] = [];
-  let enrolledSubjects: any[] = [];
-  let availableSubjects: any[] = [];
-  let selectedSubjectForEnrollment = '';
-  let showEnrollmentModal = false;
-
-  // Grade management for period-based entry
-  type AcademicPeriod = 'prelim' | 'midterm' | 'semifinals' | 'finals';
-  let activePeriod: AcademicPeriod = 'prelim';
-
-  // Store grades by period and enrolled subject ID
-  let gradesByPeriod: {
-    [period in AcademicPeriod]: { [enrolledSubjectId: string]: number | null }
-  } = {
-    prelim: {},
-    midterm: {},
-    semifinals: {},
-    finals: {}
-  };
-
-  // UI State
-  let activeTab = 'enrollment'; // 'enrollment' or 'grades'
+  let gradeRows: GradeRow[] = [];
   let loading = false;
   let saving = false;
   let error = '';
-  let success: string = '';
+  let success = '';
 
-  // Academic periods configuration
-  const academicPeriods: { id: AcademicPeriod; name: string; weight: number; color: string }[] = [
-    { id: 'prelim', name: 'Prelim', weight: 0.2, color: 'blue' },
-    { id: 'midterm', name: 'Midterm', weight: 0.2, color: 'green' },
-    { id: 'semifinals', name: 'Semifinals', weight: 0.3, color: 'yellow' },
-    { id: 'finals', name: 'Finals', weight: 0.3, color: 'red' }
+  // Academic terms data
+  let academicTerms: any[] = [];
+  let selectedAcademicTermId = '';
+
+  // Term modal
+  let showTermModal = false;
+  let newTerm = {
+    name: '',
+    startDate: '',
+    endDate: '',
+    isActive: false
+  };
+  let termModalError = '';
+  let termModalSaving = false;
+
+  // Grade row interface
+  interface GradeRow {
+    id: string;
+    subjectId: string;
+    subjectCode: string;
+    subjectName: string;
+    units: number;
+    prelim: number | null;
+    midterm: number | null;
+    semifinals: number | null;
+    finals: number | null;
+    combined: number | null;
+    remarks: string;
+    isNew?: boolean;
+    [key: string]: string | number | null | boolean | undefined;
+  }
+
+  // Academic periods for headers
+  const academicPeriods = [
+    { id: 'prelim', name: 'Prelim', weight: 0.2 },
+    { id: 'midterm', name: 'Midterm', weight: 0.2 },
+    { id: 'semifinals', name: 'Semifinals', weight: 0.3 },
+    { id: 'finals', name: 'Finals', weight: 0.3 }
   ];
 
-  // Load data from query params
   onMount(async () => {
     const params = $page.url.searchParams;
     studNo = params.get('studNo') ?? '';
+    studentName = params.get('name') ?? '';
+
+    await loadAcademicTerms();
+
+    // Set default academic term
+    if (academicTerms.length > 0) {
+      selectedAcademicTermId = academicTerms.find(t => t.isActive)?.id ?? academicTerms[0].id;
+      academicTermId = selectedAcademicTermId;
+    }
 
     if (studNo) {
-      // Load all subjects first, then student data
-      await loadAllSubjects();
-      await loadStudentInfo();
-      await loadStudentEnrollmentsAndGrades();
+      await Promise.all([
+        loadAllSubjects(),
+        loadStudentInfo()
+      ]);
+      await loadStudentGrades();
+      addEmptyRow();
     }
   });
 
+  async function loadAcademicTerms() {
+    try {
+      const res = await fetch('/api/academic-terms/active');
+      if (res.ok) {
+        academicTerms = await res.json();
+      }
+    } catch (e) {
+      error = 'Failed to load academic terms.';
+    }
+  }
+
+  function onAcademicTermChange(e: Event) {
+    const target = e.target as HTMLSelectElement;
+    selectedAcademicTermId = target.value;
+    academicTermId = selectedAcademicTermId;
+    loadStudentGrades();
+  }
+
   async function loadStudentInfo() {
     try {
-      const res = await fetch(`/api/students?studNo=${studNo}`);
+      const res = await fetch('/api/students');
       if (res.ok) {
         const students = await res.json();
         const student = students.find((s: any) => s.studNo === studNo);
+          
         if (student) {
-          studentName = `${student.firstName} ${student.lastName}`;
-          course = student.course;
-          yearLevel = student.yearLevel ?? '';
-          section = student.section ?? '';
+          studentName = `${student.firstName || ''} ${student.lastName || ''}`.trim();
+          course = student.course || '';
+          yearLevel = student.yearLevel || '';
+          section = student.section || '';
         }
       }
-    } catch (e: unknown) {
-      console.error('Failed to load student info:', e instanceof Error ? e.message : e);
+    } catch (e) {
+      console.error('Failed to load student info:', e);
     }
   }
 
@@ -100,242 +142,216 @@
     }
   }
 
-  // Load enrollments using the dedicated enrollments API
-  async function loadStudentEnrollmentsAndGrades() {
-    if (!studNo) return;
+  async function loadStudentGrades() {
+    if (!studNo || !academicTermId) return;
 
     loading = true;
     error = '';
-    
+
     try {
-      // Load enrollments from /api/enrollments
-      const enrollmentRes = await fetch(`/api/enrollments?studNo=${studNo}`);
-      if (enrollmentRes.ok) {
-        enrolledSubjects = await enrollmentRes.json();
+      const res = await fetch(`/api/students/add_grades?studNo=${studNo}&academicTermId=${academicTermId}`);
+      if (res.ok) {
+        const enrollments = await res.json();
+
+        gradeRows = enrollments.map((enrollment: any) => ({
+          id: enrollment.enrollmentId,
+          subjectId: enrollment.subjectId,
+          subjectCode: enrollment.subjectCode || '',
+          subjectName: enrollment.subjectName || '',
+          units: enrollment.units || 0,
+          prelim: enrollment.prelim ?? null,
+          midterm: enrollment.midterm ?? null,
+          semifinals: enrollment.semifinals ?? null,
+          finals: enrollment.finals ?? null,
+          combined: enrollment.combined ?? null,
+          remarks: enrollment.remarks ?? '',
+          isNew: false
+        }));
+
+        addEmptyRow();
       } else {
-        console.error('Failed to load enrollments');
-        enrolledSubjects = [];
+        const errorData = await res.json();
+        error = errorData.error || 'Failed to load student grades';
       }
-
-      // Load grades from /api/students/add_grades
-      const gradesRes = await fetch(`/api/students/add_grades?studNo=${studNo}`);
-      if (gradesRes.ok) {
-        const data = await gradesRes.json();
-        const grades = data.grades ?? {};
-
-        // Initialize gradesByPeriod for each enrolled subject
-        academicPeriods.forEach((period) => {
-          gradesByPeriod[period.id] = {};
-          for (const subject of enrolledSubjects) {
-            gradesByPeriod[period.id][subject.id] = grades[period.id] ?? null;
-          }
-        });
-      }
-
-      updateAvailableSubjects();
-    } catch (e: unknown) {
-      console.error('Failed to load enrollments/grades:', e instanceof Error ? e.message : e);
-      error = 'Failed to load enrolled subjects or grades';
+    } catch (e) {
+      console.error('Failed to load grades:', e);
+      error = 'Failed to load student grades';
     }
     loading = false;
   }
 
-  function updateAvailableSubjects() {
-    const enrolledSubjectIds = enrolledSubjects.map(s => s.id);
-    availableSubjects = allSubjects.filter(subject =>
-      !enrolledSubjectIds.includes(subject.id)
-    );
+  function addEmptyRow() {
+    const newRow: GradeRow = {
+      id: `new_${Date.now()}`,
+      subjectId: '',
+      subjectCode: '',
+      subjectName: '',
+      units: 0,
+      prelim: null,
+      midterm: null,
+      semifinals: null,
+      finals: null,
+      combined: null,
+      remarks: '',
+      isNew: true
+    };
+    gradeRows = [...gradeRows, newRow];
   }
 
-  async function enrollInSubject() {
-    if (!selectedSubjectForEnrollment) {
-      error = 'Please select a subject to enroll';
-      return;
+  function onSubjectChange(rowIndex: number, subjectId: string) {
+    if (!subjectId) return;
+    
+    const subject = allSubjects.find(s => s.id === subjectId);
+    if (subject) {
+      gradeRows[rowIndex] = {
+        ...gradeRows[rowIndex],
+        subjectId: subject.id,
+        subjectCode: subject.code,
+        subjectName: subject.name,
+        units: subject.units
+      };
+
+      if (gradeRows[rowIndex].isNew) {
+        enrollStudentInSubject(subjectId, rowIndex);
+      }
     }
+  }
 
-    saving = true;
-    error = '';
-    success = '';
-
+  async function enrollStudentInSubject(subjectId: string, rowIndex: number) {
     try {
-      // Use the enrollments API for consistency
-      const res = await fetch('/api/enrollments', {
+      const res = await fetch('/api/students/add_grades', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studNo,
-          subjectId: selectedSubjectForEnrollment
+          subjectId,
+          academicTermId
         })
       });
 
-      const data = await res.json();
-
       if (res.ok) {
-        success = 'Student enrolled successfully!';
-        
-        // Reload data to get updated enrollments
-        await loadStudentEnrollmentsAndGrades();
-        
-        // Reset form
-        selectedSubjectForEnrollment = '';
-        showEnrollmentModal = false;
-        
-        // Clear success message after 3 seconds
+        const result = await res.json();
+        // Update the row with the new enrollment ID
+        gradeRows[rowIndex] = {
+          ...gradeRows[rowIndex],
+          id: result.gradeSubjectId,
+          isNew: false
+        };
+        // Add a new empty row for next enrollment
+        addEmptyRow();
+        success = 'Student enrolled in subject successfully!';
         setTimeout(() => success = '', 3000);
       } else {
+        const data = await res.json();
         error = data.error || 'Failed to enroll student';
+        gradeRows[rowIndex] = {
+          ...gradeRows[rowIndex],
+          subjectId: '',
+          subjectCode: '',
+          subjectName: '',
+          units: 0
+        };
       }
     } catch (e) {
       console.error('Enrollment error:', e);
       error = 'Network error while enrolling student';
     }
-    saving = false;
   }
 
-  async function unenrollFromSubject(subjectId: string) {
-    if (!confirm('Are you sure you want to unenroll from this subject? This will also delete all grades.')) {
+  async function saveGrade(rowIndex: number, period: string, value: number | null) {
+    if (gradeRows[rowIndex].isNew || !gradeRows[rowIndex].subjectId) return;
+    if (value === null || value <= 0) return;
+
+    const originalValue = gradeRows[rowIndex][period as keyof GradeRow];
+    
+    try {
+      const gradeData = {
+        studNo,
+        academicTermId,
+        subjectId: gradeRows[rowIndex].subjectId,
+        [period]: value
+      };
+
+      const res = await fetch('/api/students/add_grades', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gradeData)
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        if (result.updatedGrade) {
+          gradeRows[rowIndex] = {
+            ...gradeRows[rowIndex],
+            prelim: result.updatedGrade.prelim,
+            midterm: result.updatedGrade.midterm,
+            semifinals: result.updatedGrade.semifinals,
+            finals: result.updatedGrade.finals,
+            combined: result.updatedGrade.combined,
+            remarks: result.updatedGrade.remarks
+          };
+        }
+        success = `Grade saved successfully!`;
+        setTimeout(() => success = '', 2000);
+      } else {
+        const errorData = await res.json();
+        error = errorData.error || 'Failed to save grade';
+        (gradeRows[rowIndex][period as keyof GradeRow] as any) = originalValue;
+      }
+    } catch (e) {
+      console.error('Grade save error:', e);
+      error = 'Failed to save grade';
+      (gradeRows[rowIndex][period as keyof GradeRow] as any) = originalValue;
+    }
+  }
+
+  async function deleteRow(rowIndex: number) {
+    const row = gradeRows[rowIndex];
+    if (row.isNew) {
+      gradeRows = gradeRows.filter((_, i) => i !== rowIndex);
       return;
     }
 
-    saving = true;
-    error = '';
-    success = '';
+    if (!confirm('Are you sure you want to remove this subject enrollment? This will delete all grades.')) {
+      return;
+    }
 
     try {
-      const res = await fetch('/api/enrollments', {
+      const res = await fetch('/api/students/add_grades', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studNo,
-          subjectId
+          enrollmentId: row.id
         })
       });
 
       if (res.ok) {
-        success = 'Student unenrolled successfully!';
-        
-        // Reload data to get updated enrollments
-        await loadStudentEnrollmentsAndGrades();
-
-        // Clear grades for this subject in UI
-        academicPeriods.forEach(period => {
-          delete gradesByPeriod[period.id][subjectId];
-        });
-
+        gradeRows = gradeRows.filter((_, i) => i !== rowIndex);
+        success = 'Subject enrollment removed successfully!';
         setTimeout(() => success = '', 3000);
       } else {
         const data = await res.json();
-        error = data.error || 'Failed to unenroll student';
+        error = data.error || 'Failed to remove enrollment';
       }
     } catch (e) {
-      console.error('Unenrollment error:', e);
-      error = 'Network error while unenrolling student';
+      console.error('Delete error:', e);
+      error = 'Network error while removing enrollment';
     }
-    saving = false;
   }
 
-  // Save grades for all subjects in the selected period
-  async function savePeriodGrades(period: AcademicPeriod) {
-    saving = true;
-    error = '';
-    success = '';
-
-    try {
-      // Check if there are any grades to save for this period
-      const hasGrades = Object.values(gradesByPeriod[period]).some(grade => 
-        grade !== null && grade !== undefined && grade > 0
-      );
-
-      if (!hasGrades) {
-        error = `No valid grades entered for ${period}`;
-        saving = false;
-        return;
-      }
-
-      // Get the first enrolled subject ID (required by API)
-      const firstSubjectId = enrolledSubjects[0]?.id;
-      if (!firstSubjectId) {
-        error = 'No enrolled subjects found';
-        saving = false;
-        return;
-      }
-
-      // Get the grade value (assuming single grade per period across all subjects)
-      const gradeValue = Object.values(gradesByPeriod[period]).find(v => 
-        v !== null && v !== undefined && v > 0
-      );
-
-      if (gradeValue !== null && gradeValue !== undefined && gradeValue > 0) {
-        const gradeData = {
-          studNo,
-          subjectId: firstSubjectId,
-          [period]: gradeValue
-        };
-
-        const res = await fetch('/api/students/add_grades', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(gradeData)
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to save grade');
-        }
-
-        success = `Grades for ${period} saved successfully!`;
-        setTimeout(() => success = '', 3000);
-        await loadStudentEnrollmentsAndGrades();
-      }
-    } catch (e) {
-      console.error('Grade save error:', e);
-      error = `Failed to save ${period} grades: ${e.message}`;
+  function calculateFinalGrade(row: GradeRow): { finalGrade: number | null; remarks: string } {
+    if (row.combined && row.combined > 0) {
+      return { 
+        finalGrade: row.combined, 
+        remarks: row.remarks || (row.combined >= 75 ? 'PASSED' : 'FAILED')
+      };
     }
 
-    saving = false;
-  }
-
-  function generateGradeSummary(period: AcademicPeriod): string {
-    const gradePairs: string[] = [];
-    enrolledSubjects.forEach(subject => {
-      const grade = gradesByPeriod[period][subject.id];
-      if (grade !== null && grade !== undefined && grade > 0) {
-        gradePairs.push(`${subject.code}: ${grade}`);
-      }
-    });
-    return gradePairs.join('; ');
-  }
-
-  function toggleSidebar() {
-    sidebarOpen = !sidebarOpen;
-  }
-
-  function toggleSidebarCollapsed() {
-    sidebarCollapsed = !sidebarCollapsed;
-  }
-
-  function closeSidebar() {
-    sidebarOpen = false;
-  }
-
-  function getGradeColor(grade: number | null) {
-    if (grade === null) return 'text-gray-400';
-    if (grade >= 90) return 'text-green-600';
-    if (grade >= 85) return 'text-blue-600';
-    if (grade >= 75) return 'text-yellow-600';
-    return 'text-red-600';
-  }
-
-  function goBack() {
-    goto('/dashboard/students');
-  }
-
-  function calculateFinalGrade(enrolledSubjectId: string): { finalGrade: number | null; remarks: string } {
     let totalWeightedGrade = 0;
     let totalWeight = 0;
 
     academicPeriods.forEach(period => {
-      const grade = gradesByPeriod[period.id][enrolledSubjectId];
+      const grade = row[period.id as keyof GradeRow] as number;
       if (grade !== null && grade > 0) {
         totalWeightedGrade += grade * period.weight;
         totalWeight += period.weight;
@@ -351,10 +367,36 @@
     return { finalGrade: null, remarks: '' };
   }
 
-  // Clear error messages when switching tabs
-  $: if (activeTab) {
-    error = '';
-    success = '';
+  function getGradeColor(grade: number | null) {
+    if (grade === null || grade === 0) return 'text-gray-400';
+    if (grade >= 90) return 'text-green-600';
+    if (grade >= 85) return 'text-blue-600';
+    if (grade >= 75) return 'text-yellow-600';
+    return 'text-red-600';
+  }
+
+  function getAvailableSubjects(currentRowIndex: number) {
+    const usedSubjectIds = gradeRows
+      .filter((_, index) => index !== currentRowIndex && !gradeRows[index].isNew)
+      .map(row => row.subjectId);
+    
+    return allSubjects.filter(subject => !usedSubjectIds.includes(subject.id));
+  }
+
+  function toggleSidebar() {
+    sidebarOpen = !sidebarOpen;
+  }
+
+  function toggleSidebarCollapsed() {
+    sidebarCollapsed = !sidebarCollapsed;
+  }
+
+  function closeSidebar() {
+    sidebarOpen = false;
+  }
+
+  function goBack() {
+    goto('/dashboard/students');
   }
 </script>
 
@@ -402,29 +444,7 @@
 
     <!-- Page Content -->
     <div class="flex-1 overflow-auto">
-      <!-- Header -->
-      <div class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex items-center justify-between h-16">
-            <div class="flex items-center space-x-4">
-              <button 
-                class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                on:click={goBack}
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                </svg>
-              </button>
-              <div>
-                <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Student Information System</h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Subject enrollment and grade management</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Student Info Card -->
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
           <div class="flex items-center space-x-4">
@@ -434,46 +454,20 @@
               </svg>
             </div>
             <div class="flex-1">
-              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{studentName}</h2>
+              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{studentName || 'Loading...'}</h2>
               <p class="text-gray-600 dark:text-gray-400">Student No: {studNo}</p>
               <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                <span>Course: {course}</span>
-                <span>Year: {yearLevel}</span>
-                <span>Section: {section}</span>
+                <span>Course: {course || 'N/A'}</span>
+                <span>Year: {yearLevel || 'N/A'}</span>
+                <span>Section: {section || 'N/A'}</span>
               </div>
             </div>
             <div class="text-right">
               <div class="text-sm text-gray-500 dark:text-gray-400">Enrolled Subjects</div>
-              <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{enrolledSubjects.length}</div>
+              <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {gradeRows.filter(row => !row.isNew).length}
+              </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Tab Navigation -->
-        <div class="mb-8">
-          <div class="border-b border-gray-200 dark:border-gray-700">
-            <nav class="flex space-x-8">
-              <button
-                class="py-4 px-1 border-b-2 font-medium text-sm {
-                  activeTab === 'enrollment'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                }"
-                on:click={() => activeTab = 'enrollment'}
-              >
-                Subject Enrollment
-              </button>
-              <button
-                class="py-4 px-1 border-b-2 font-medium text-sm {
-                  activeTab === 'grades'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                }"
-                on:click={() => activeTab = 'grades'}
-              >
-                Grade Management
-              </button>
-            </nav>
           </div>
         </div>
 
@@ -496,347 +490,202 @@
           </div>
         {/if}
 
-        <!-- Tab Content -->
-        {#if activeTab === 'enrollment'}
-          <!-- Subject Enrollment Tab -->
-          <div class="space-y-6">
-            <!-- Add Subject Button -->
-            <div class="flex justify-between items-center">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Enrolled Subjects</h3>
-              <button
-                on:click={() => {
-                  if (availableSubjects.length === 0) {
-                    error = 'No available subjects to enroll in';
-                    return;
-                  }
-                  showEnrollmentModal = true;
-                  error = '';
-                }}
-                class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={loading || availableSubjects.length === 0}
-              >
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                Enroll in Subject
-              </button>
-            </div>
+        <!-- Academic Term Dropdown -->
+        <div class="mb-6 flex items-center space-x-3">
+          <label for="academic-term" class="text-sm font-medium text-gray-700 dark:text-gray-300">Academic Term:</label>
+          <select
+            id="academic-term"
+            class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            bind:value={selectedAcademicTermId}
+            on:change={onAcademicTermChange}
+          >
+            {#each academicTerms as term}
+              <option value={term.id}>
+                {term.name} ({term.startDate} - {term.endDate}) {term.isActive ? '[Active]' : ''}
+              </option>
+            {/each}
+          </select>
+        </div>
 
-            <!-- Enrolled Subjects List -->
-            {#if loading}
-              <div class="flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            {:else if enrolledSubjects.length === 0}
-              <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
-                <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                  <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                  </svg>
-                </div>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No Enrolled Subjects</h3>
-                <p class="text-gray-500 dark:text-gray-400">Click "Enroll in Subject" to add subjects for this student.</p>
-              </div>
-            {:else}
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {#each enrolledSubjects as subject}
-                  {@const finalGradeData = calculateFinalGrade(subject.id)}
-                  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <div class="flex justify-between items-start mb-4">
-                      <div class="flex-1">
-                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">{subject.code}</h4>
-                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">{subject.name}</p>
-                        <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                          <span>{subject.units} units</span>
-                        </div>
-                      </div>
-                      <button
-                        on:click={() => unenrollFromSubject(subject.id)}
-                        disabled={saving}
-                        class="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
-                        title="Unenroll from subject"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                      </button>
-                    </div>
-                    
-                    {#if finalGradeData.finalGrade}
-                      <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div class="text-center">
-                          <div class="text-sm text-gray-600 dark:text-gray-400">Final Grade</div>
-                          <div class="text-xl font-bold {getGradeColor(finalGradeData.finalGrade)}">
-                            {finalGradeData.finalGrade}
-                          </div>
-                          <div class="text-xs font-semibold {(finalGradeData.finalGrade ?? 0) >= 75 ? 'text-green-600' : 'text-red-600'}">
-                            {finalGradeData.remarks}
-                          </div>
-                        </div>
-                      </div>
-                    {:else}
-                      <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                        <div class="text-sm text-gray-500 dark:text-gray-400">No grades entered</div>
-                      </div>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            {/if}
-
-            <!-- Enrollment Modal -->
-            {#if showEnrollmentModal}
-              <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full">
-                  <div class="p-6">
-                    <div class="flex items-center justify-between mb-6">
-                      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Enroll in Subject</h3>
-                      <button
-                        on:click={() => {
-                          showEnrollmentModal = false;
-                          selectedSubjectForEnrollment = '';
-                          error = '';
-                        }}
-                        class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg"
-                      >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                      </button>
-                    </div>
-                    
-                    <div class="mb-6">
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Select Subject
-                      </label>
-                      <select
-                        bind:value={selectedSubjectForEnrollment}
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={saving}
-                      >
-                        <option value="">Select a subject...</option>
-                        {#each availableSubjects as subject}
-                          <option value={subject.id}>
-                            {subject.code} - {subject.name} ({subject.units} units)
-                          </option>
-                        {/each}
-                      </select>
-                      {#if availableSubjects.length === 0}
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                          No available subjects to enroll in.
-                        </p>
-                      {/if}
-                    </div>
-                    
-                    <div class="flex justify-end space-x-3">
-                      <button
-                        on:click={() => {
-                          showEnrollmentModal = false;
-                          selectedSubjectForEnrollment = '';
-                          error = '';
-                        }}
-                        disabled={saving}
-                        class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        on:click={enrollInSubject}
-                        disabled={!selectedSubjectForEnrollment || saving}
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-                      >
-                        {#if saving}
-                          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        {/if}
-                        <span>Enroll</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {/if}
+        <!-- Excel-style Grade Table -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Subject Grades</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Select subjects and enter grades directly in the table</p>
           </div>
-        
-        {:else if activeTab === 'grades'}
-          <!-- Grade Management Tab -->
-          <div class="space-y-6">
-            <!-- Period Selection -->
-            <div class="mb-6">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Select Academic Period</h3>
-              <div class="flex flex-wrap gap-3">
-                {#each academicPeriods as period}
-                  <button
-                    class="px-4 py-2 rounded-lg font-semibold transition-colors {
-                      activePeriod === period.id 
-                        ? 'bg-blue-600 text-white shadow-md' 
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }"
-                    on:click={() => activePeriod = period.id}
-                  >
-                    {period.name} ({Math.round((period.weight ?? 0) * 100)}%)
-                  </button>
-                {/each}
-              </div>
+          
+          {#if loading}
+            <div class="flex justify-center py-12">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-
-            <!-- Grade Entry Section -->
-            {#if enrolledSubjects.length === 0}
-              <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
-                <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                  <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                </div>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No Enrolled Subjects</h3>
-                <p class="text-gray-500 dark:text-gray-400">Please enroll in subjects first before adding grades.</p>
-              </div>
-            {:else}
-              <!-- Grade Entry Form -->
-              <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <div class="flex items-center justify-between mb-6">
-                  <h4 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    Enter {activePeriod.charAt(0).toUpperCase() + activePeriod.slice(1)} Grades
-                  </h4>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">
-                    Weight: {Math.round((academicPeriods.find(p => p.id === activePeriod)?.weight ?? 0) * 100)}%
-                  </div>
-                </div>
-
-                <!-- Grade Input Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                  {#each enrolledSubjects as subject}
-                    <div class="space-y-3">
-                      <div class="flex items-center space-x-2">
-                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                        <div>
-                          <div class="font-semibold text-gray-900 dark:text-white">{subject.code}</div>
-                          <div class="text-sm text-gray-500 dark:text-gray-400">{subject.name}</div>
-                        </div>
-                      </div>
-                      
-                      <div class="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          bind:value={gradesByPeriod[activePeriod][subject.id]}
-                          placeholder="Enter grade (0-100)"
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-center text-lg font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        {#if gradesByPeriod[activePeriod][subject.id] !== null && gradesByPeriod[activePeriod][subject.id] > 0}
-                          <div class="absolute right-2 top-1/2 transform -translate-y-1/2">
-                            <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+          {:else}
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600" style="min-width: 250px;">
+                      Subject
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600" style="min-width: 80px;">
+                      Units
+                    </th>
+                    {#each academicPeriods as period}
+                      <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600" style="min-width: 100px;">
+                        {period.name}<br>
+                        <span class="font-normal">({Math.round(period.weight * 100)}%)</span>
+                      </th>
+                    {/each}
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600" style="min-width: 100px;">
+                      Final Grade
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600" style="min-width: 100px;">
+                      Remarks
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider" style="min-width: 80px;">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {#each gradeRows as row, rowIndex}
+                    {@const finalGradeData = calculateFinalGrade(row)}
+                    {@const availableSubjects = getAvailableSubjects(rowIndex)}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 {row.isNew ? 'bg-blue-50 dark:bg-blue-900/10' : ''}">
+                      <!-- Subject Selection -->
+                      <td class="px-4 py-3 border-r border-gray-200 dark:border-gray-600">
+                        {#if row.isNew}
+                          <select
+                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={row.subjectId}
+                            on:change={(e) => {
+                              const target = e.target as HTMLSelectElement | null;
+                              if (target) onSubjectChange(rowIndex, target.value);
+                            }}
+                          >
+                            <option value="">Select a subject...</option>
+                            {#each availableSubjects as subject}
+                              <option value={subject.id}>
+                                {subject.code} - {subject.name}
+                              </option>
+                            {/each}
+                          </select>
+                        {:else}
+                          <div class="text-sm">
+                            <div class="font-medium text-gray-900 dark:text-white">{row.subjectCode}</div>
+                            <div class="text-gray-500 dark:text-gray-400">{row.subjectName}</div>
                           </div>
                         {/if}
-                      </div>
-                    </div>
-                  {/each}
-                </div>
+                      </td>
 
-                <!-- Grade Summary Display -->
-                {#if generateGradeSummary(activePeriod)}
-                  <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <div class="text-sm text-blue-700 dark:text-blue-300 font-medium mb-2">
-                      {activePeriod.charAt(0).toUpperCase() + activePeriod.slice(1)} Grade Summary:
-                    </div>
-                    <div class="font-mono text-sm text-blue-800 dark:text-blue-200 bg-white dark:bg-gray-800 p-2 rounded border">
-                      {generateGradeSummary(activePeriod)}
-                    </div>
-                  </div>
-                {/if}
+                      <!-- Units -->
+                      <td class="px-4 py-3 text-center border-r border-gray-200 dark:border-gray-600">
+                        <span class="text-sm text-gray-900 dark:text-white">
+                          {row.units || '—'}
+                        </span>
+                      </td>
 
-                <!-- Save Button -->
-                <div class="flex justify-end">
-                  <button
-                    on:click={() => savePeriodGrades(activePeriod)}
-                    disabled={saving || !generateGradeSummary(activePeriod)}
-                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-                  >
-                    {#if saving}
-                      <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    {/if}
-                    <span>Save {activePeriod.charAt(0).toUpperCase() + activePeriod.slice(1)} Grades</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Grade Overview Table -->
-              <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Grade Overview</h4>
-                </div>
-                
-                <div class="overflow-x-auto">
-                  <table class="w-full">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Subject
-                        </th>
-                        {#each academicPeriods as period}
-                          <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            {period.name}
-                          </th>
-                        {/each}
-                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Final Grade
-                        </th>
-                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Remarks
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {#each enrolledSubjects as subject}
-                        {@const finalGradeData = calculateFinalGrade(subject.id)}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td class="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div class="text-sm font-medium text-gray-900 dark:text-white">{subject.code}</div>
-                              <div class="text-sm text-gray-500 dark:text-gray-400">{subject.name}</div>
-                            </div>
-                          </td>
-                          {#each academicPeriods as period}
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                              <span class="text-sm font-semibold {getGradeColor(gradesByPeriod[period.id][subject.id])}">
-                                {gradesByPeriod[period.id][subject.id] || '—'}
-                              </span>
-                            </td>
-                          {/each}
-                          <td class="px-6 py-4 whitespace-nowrap text-center">
-                            <span class="text-lg font-bold {getGradeColor(finalGradeData.finalGrade)}">
-                              {finalGradeData.finalGrade || '—'}
-                            </span>
-                          </td>
-                          <td class="px-6 py-4 whitespace-nowrap text-center">
-                            {#if finalGradeData.remarks}
-                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {
-                                finalGradeData.remarks === 'PASSED' 
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                              }">
-                                {finalGradeData.remarks}
-                              </span>
-                            {:else}
-                              <span class="text-gray-400">—</span>
-                            {/if}
-                          </td>
-                        </tr>
+                      <!-- Grade Columns -->
+                      {#each academicPeriods as period}
+                        <td class="px-2 py-3 border-r border-gray-200 dark:border-gray-600">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={row[period.id] && row[period.id] !== 0 ? row[period.id] : ''}
+                            placeholder="—"
+                            disabled={row.isNew || !row.subjectId}
+                            class="w-full px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed {getGradeColor(row[period.id])}"
+                            on:input={(e) => {
+                              const target = e.target as HTMLInputElement | null;
+                              if (target) {
+                                const value = parseFloat(target.value);
+                                row[period.id as keyof GradeRow] = isNaN(value) ? null : value;
+                              }
+                            }}
+                            on:blur={(e) => {
+                              const target = e.target as HTMLInputElement | null;
+                              if (target) {
+                                const value = parseFloat(target.value);
+                                if (!isNaN(value) && value > 0) {
+                                  saveGrade(rowIndex, period.id, value);
+                                }
+                              }
+                            }}
+                          />
+                        </td>
                       {/each}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            {/if}
+
+                      <!-- Final Grade -->
+                      <td class="px-4 py-3 text-center border-r border-gray-200 dark:border-gray-600">
+                        <span class="text-sm font-bold {getGradeColor(finalGradeData.finalGrade)}">
+                          {finalGradeData.finalGrade || '—'}
+                        </span>
+                      </td>
+
+                      <!-- Remarks -->
+                      <td class="px-4 py-3 text-center border-r border-gray-200 dark:border-gray-600">
+                        {#if finalGradeData.remarks}
+                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {
+                            finalGradeData.remarks === 'PASSED' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }">
+                            {finalGradeData.remarks}
+                          </span>
+                        {:else}
+                          <span class="text-gray-400 text-sm">—</span>
+                        {/if}
+                      </td>
+
+                      <!-- Actions -->
+                      <td class="px-4 py-3 text-center">
+                        <button
+                          on:click={() => deleteRow(rowIndex)}
+                          class="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                          title={row.isNew ? 'Remove row' : 'Remove enrollment'}
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  {/each}
+
+                  <!-- Empty state -->
+                  {#if gradeRows.length === 0}
+                    <tr>
+                      <td colspan="9" class="px-6 py-12 text-center">
+                        <div class="text-gray-500 dark:text-gray-400">
+                          No subjects enrolled. Add subjects using the dropdown above.
+                        </div>
+                      </td>
+                    </tr>
+                  {/if}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Instructions -->
+        <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div class="flex items-start space-x-3">
+            <svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div class="text-sm text-blue-700 dark:text-blue-300">
+              <strong>How to use:</strong>
+              <ul class="mt-2 space-y-1 list-disc list-inside">
+                <li>Select a subject from the dropdown to enroll the student</li>
+                <li>Enter grades directly in the period columns (values auto-save on blur)</li>
+                <li>Final grades are automatically calculated based on period weights</li>
+                <li>Use the delete button to remove subject enrollments</li>
+              </ul>
+            </div>
           </div>
-        {/if}
+        </div>
       </div>
     </div>
   </div>
